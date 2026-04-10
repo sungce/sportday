@@ -20,12 +20,12 @@ import {
   LayoutDashboard, 
   Settings, 
   Medal, 
-  Users, 
   TrendingUp,
   Award,
   Sparkles,
   Download,
-  Github
+  Github,
+  Lock
 } from 'lucide-react';
 
 // --- Firebase 설정 ---
@@ -51,17 +51,31 @@ const GRADES = [
   { grade: 3, classes: 11 },
 ];
 
+const ADMIN_PW = "suwan123"; // 관리자 메뉴 접근 암호
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [view, setView] = useState('dashboard');
   const [scores, setScores] = useState({});
   const [loading, setLoading] = useState(true);
+  
+  // 관리자 인증 상태
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [showAdminModal, setShowAdminModal] = useState(false);
+  const [adminPwd, setAdminPwd] = useState('');
 
+  // Firebase Auth 초기화
   useEffect(() => {
     const initAuth = async () => {
-      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-        await signInWithCustomToken(auth, __initial_auth_token);
-      } else {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (err) {
+        console.error("Auth Error:", err);
+        // 토큰 만료 등의 에러 발생 시 익명 로그인으로 폴백
         await signInAnonymously(auth);
       }
     };
@@ -70,6 +84,7 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // Firestore 데이터 리스너
   useEffect(() => {
     if (!user) return;
     const scoresRef = collection(db, 'artifacts', appId, 'public', 'data', 'scores');
@@ -84,13 +99,15 @@ export default function App() {
       setLoading(false);
     }, (error) => {
       console.error("Firestore Error:", error);
+      setLoading(false);
     });
 
     return () => unsubscribe();
   }, [user]);
 
+  // 점수 업데이트 로직
   const updateScore = async (grade, classNum, eventId, value) => {
-    if (!user) return;
+    if (!user || !isAdmin) return; // 관리자가 아니면 점수 수정 차단
     const docId = `${grade}-${classNum}`;
     const currentData = scores[docId] || { grade, classNum };
     const finalValue = value === "" ? null : (isNaN(value) ? value : parseInt(value));
@@ -102,6 +119,28 @@ export default function App() {
     });
   };
 
+  // 관리자 인증 처리
+  const handleAdminAuth = () => {
+    if (adminPwd === ADMIN_PW) {
+      setIsAdmin(true);
+      setShowAdminModal(false);
+      setAdminPwd('');
+      setView('admin');
+    } else {
+      alert("비밀번호가 일치하지 않습니다.");
+      setAdminPwd('');
+    }
+  };
+
+  const handleAdminNavClick = () => {
+    if (isAdmin) {
+      setView('admin');
+    } else {
+      setShowAdminModal(true);
+    }
+  };
+
+  // 점수 통계 계산
   const stats = useMemo(() => {
     const results = [];
     GRADES.forEach(g => {
@@ -138,13 +177,14 @@ export default function App() {
     return results;
   }, [scores]);
 
+  // 순위 계산
   const getRank = (grade, total) => {
     const gradeTotals = stats.filter(s => s.grade === grade).map(s => s.total);
     const sorted = [...new Set(gradeTotals)].sort((a, b) => b - a);
     return sorted.indexOf(total) + 1;
   };
 
-  // 데이터를 JSON으로 내보내는 기능 (GitHub 업로드용)
+  // 데이터를 JSON으로 내보내는 기능
   const exportToJson = () => {
     const backupData = {
       appId,
@@ -174,19 +214,58 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-12">
+      {/* --- 관리자 인증 모달 --- */}
+      {showAdminModal && (
+        <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 animate-in fade-in border border-slate-200">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg">
+                <Lock className="w-5 h-5" />
+              </div>
+              <h3 className="text-lg font-bold">채점 권한 인증</h3>
+            </div>
+            <p className="text-sm text-slate-500 mb-4">심판 및 관리자 전용 메뉴입니다.<br/>암호를 입력해 주세요.</p>
+            <input
+              type="password"
+              value={adminPwd}
+              onChange={(e) => setAdminPwd(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleAdminAuth(); }}
+              className="w-full p-3 bg-slate-100 border-2 border-transparent focus:border-indigo-600 rounded-xl outline-none mb-4 text-center text-lg font-bold tracking-widest transition-all"
+              placeholder="••••••"
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button 
+                onClick={() => { setShowAdminModal(false); setAdminPwd(''); }} 
+                className="flex-1 px-4 py-3 text-slate-500 font-bold hover:bg-slate-100 rounded-xl transition"
+              >
+                취소
+              </button>
+              <button 
+                onClick={handleAdminAuth} 
+                className="flex-1 px-4 py-3 bg-indigo-600 text-white font-bold rounded-xl shadow-lg hover:bg-indigo-700 transition"
+              >
+                인증하기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 상단 내비게이션 */}
       <nav className="bg-indigo-700 text-white shadow-xl sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => setView('dashboard')}>
             <div className="p-2 bg-white/20 rounded-lg">
               <Trophy className="w-6 h-6" />
             </div>
-            <span className="font-black text-xl tracking-tighter uppercase">2026 수완하나중 스포츠 데이</span>
+            <span className="font-black text-xl tracking-tighter uppercase whitespace-nowrap hidden sm:block">2026 수완하나중 스포츠 데이</span>
+            <span className="font-black text-lg tracking-tighter uppercase sm:hidden">수완하나중 체육대회</span>
           </div>
           <div className="flex bg-indigo-900/50 rounded-full p-1 border border-white/10">
             <NavBtn active={view === 'dashboard'} onClick={() => setView('dashboard')} icon={<LayoutDashboard size={18} />} label="대시보드" />
             <NavBtn active={view === 'table'} onClick={() => setView('table')} icon={<ClipboardList size={18} />} label="현황판" />
-            <NavBtn active={view === 'admin'} onClick={() => setView('admin')} icon={<Settings size={18} />} label="채점" />
+            <NavBtn active={view === 'admin'} onClick={handleAdminNavClick} icon={<Settings size={18} />} label="채점" />
           </div>
         </div>
       </nav>
@@ -243,7 +322,7 @@ export default function App() {
           </div>
         )}
 
-        {/* 학년별로 구분된 현황판 뷰 */}
+        {/* 현황판 뷰 */}
         {view === 'table' && (
           <div className="space-y-10 animate-in slide-in-from-right-4 duration-300">
             {GRADES.map(g => (
@@ -311,23 +390,28 @@ export default function App() {
         )}
 
         {/* 채점 뷰 */}
-        {view === 'admin' && (
+        {view === 'admin' && isAdmin && (
           <div className="space-y-6 max-w-6xl mx-auto animate-in slide-in-from-left-4 duration-300">
-             <div className="bg-indigo-600 text-white p-5 rounded-3xl shadow-lg flex items-center justify-between">
+             <div className="bg-indigo-600 text-white p-5 rounded-3xl shadow-lg flex items-center justify-between flex-wrap gap-4">
                 <div>
-                  <h2 className="text-lg font-bold">실시간 채점 센터</h2>
-                  <p className="opacity-80 text-xs">종목별 순위 혹은 임의 점수를 입력하세요.</p>
+                  <h2 className="text-lg font-bold flex items-center gap-2">
+                    <Lock className="w-5 h-5 text-indigo-300" /> 실시간 채점 센터
+                  </h2>
+                  <p className="opacity-80 text-xs mt-1">심판 및 관리자 전용 (변경사항 즉시 저장됨)</p>
                 </div>
                 <div className="flex gap-2">
                   <button 
                     onClick={exportToJson}
                     className="flex items-center gap-2 bg-white/20 hover:bg-white/30 px-3 py-2 rounded-xl text-xs font-bold transition"
-                    title="GitHub 업로드용 JSON 백업"
                   >
-                    <Download size={14} />
-                    데이터 백업 (JSON)
+                    <Download size={14} /> JSON 백업
                   </button>
-                  <Settings className="w-8 h-8 opacity-30" />
+                  <button 
+                    onClick={() => { setIsAdmin(false); setView('dashboard'); }}
+                    className="flex items-center gap-2 bg-black/20 hover:bg-black/30 px-3 py-2 rounded-xl text-xs font-bold transition"
+                  >
+                    <Lock size={14} /> 권한 잠금
+                  </button>
                 </div>
              </div>
 
@@ -404,11 +488,12 @@ export default function App() {
   );
 }
 
+// 네비게이션 버튼 컴포넌트
 function NavBtn({ active, onClick, icon, label }) {
   return (
     <button 
       onClick={onClick}
-      className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-300 ${
+      className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full transition-all duration-300 ${
         active 
         ? 'bg-white text-indigo-700 shadow-lg scale-105 font-bold' 
         : 'text-white/70 hover:text-white hover:bg-white/10'
