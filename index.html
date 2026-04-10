@@ -1,1 +1,421 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { initializeApp } from 'firebase/app';
+import { 
+  getAuth, 
+  signInAnonymously, 
+  onAuthStateChanged, 
+  signInWithCustomToken 
+} from 'firebase/auth';
+import { 
+  getFirestore, 
+  collection, 
+  doc, 
+  onSnapshot, 
+  setDoc, 
+  query 
+} from 'firebase/firestore';
+import { 
+  Trophy, 
+  ClipboardList, 
+  LayoutDashboard, 
+  Settings, 
+  Medal, 
+  Users, 
+  TrendingUp,
+  Award,
+  Sparkles,
+  Download,
+  Github
+} from 'lucide-react';
 
+// --- Firebase 설정 ---
+const firebaseConfig = JSON.parse(__firebase_config);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'sports-day-final';
+
+// --- 종목 및 배점 기준 ---
+const EVENTS = [
+  { id: 'tug', name: '줄다리기', type: 'rank', points: { 1: 600, 2: 500, 3: 400, base: 300 } },
+  { id: 'sixLeg', name: '5인 6각', type: 'rank', points: { 1: 600, 2: 500, 3: 400, base: 300 } },
+  { id: 'jump8', name: '8자 마라톤 줄넘기', type: 'rank', points: { 1: 500, 2: 400, 3: 300, base: 200 } },
+  { id: 'longRope', name: '긴줄 함께뛰기', type: 'rank', points: { 1: 400, 2: 300, 3: 200, base: 100 } },
+  { id: 'relay', name: '이어달리기', type: 'rank', points: { 1: 400, 2: 300, 3: 200, base: 100 } },
+  { id: 'cheer', name: '기타(응원상)', type: 'raw' },
+];
+
+const GRADES = [
+  { grade: 1, classes: 10 },
+  { grade: 2, classes: 10 },
+  { grade: 3, classes: 11 },
+];
+
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [view, setView] = useState('dashboard');
+  const [scores, setScores] = useState({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const initAuth = async () => {
+      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+        await signInWithCustomToken(auth, __initial_auth_token);
+      } else {
+        await signInAnonymously(auth);
+      }
+    };
+    initAuth();
+    const unsubscribe = onAuthStateChanged(auth, setUser);
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const scoresRef = collection(db, 'artifacts', appId, 'public', 'data', 'scores');
+    const q = query(scoresRef);
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = {};
+      snapshot.forEach((doc) => {
+        data[doc.id] = doc.data();
+      });
+      setScores(data);
+      setLoading(false);
+    }, (error) => {
+      console.error("Firestore Error:", error);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const updateScore = async (grade, classNum, eventId, value) => {
+    if (!user) return;
+    const docId = `${grade}-${classNum}`;
+    const currentData = scores[docId] || { grade, classNum };
+    const finalValue = value === "" ? null : (isNaN(value) ? value : parseInt(value));
+
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'scores', docId), {
+      ...currentData,
+      [eventId]: finalValue,
+      lastUpdated: Date.now()
+    });
+  };
+
+  const stats = useMemo(() => {
+    const results = [];
+    GRADES.forEach(g => {
+      for (let c = 1; c <= g.classes; c++) {
+        const id = `${g.grade}-${c}`;
+        const classScoreData = scores[id] || {};
+        let total = 0;
+        const breakdown = {};
+
+        EVENTS.forEach(ev => {
+          const val = classScoreData[ev.id];
+          let p = 0;
+          if (ev.type === 'raw') {
+            p = parseInt(val) || 0;
+          } else {
+            if (val === 1) p = ev.points[1];
+            else if (val === 2) p = ev.points[2];
+            else if (val === 3) p = ev.points[3];
+            else if (val >= 4) p = ev.points.base;
+          }
+          total += p;
+          breakdown[ev.id] = p;
+        });
+
+        results.push({
+          id,
+          grade: g.grade,
+          classNum: c,
+          total,
+          breakdown
+        });
+      }
+    });
+    return results;
+  }, [scores]);
+
+  const getRank = (grade, total) => {
+    const gradeTotals = stats.filter(s => s.grade === grade).map(s => s.total);
+    const sorted = [...new Set(gradeTotals)].sort((a, b) => b - a);
+    return sorted.indexOf(total) + 1;
+  };
+
+  // 데이터를 JSON으로 내보내는 기능 (GitHub 업로드용)
+  const exportToJson = () => {
+    const backupData = {
+      appId,
+      exportDate: new Date().toLocaleString(),
+      scores: scores,
+      stats: stats
+    };
+    const dataStr = JSON.stringify(backupData, null, 2);
+    const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+    
+    const fileName = `suwan_sports_day_${new Date().toISOString().slice(0,10)}.json`;
+    
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', fileName);
+    linkElement.click();
+  };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-indigo-50">
+        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="mt-4 text-indigo-600 font-medium animate-pulse">데이터 불러오는 중...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-900 pb-12">
+      {/* 상단 내비게이션 */}
+      <nav className="bg-indigo-700 text-white shadow-xl sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-white/20 rounded-lg">
+              <Trophy className="w-6 h-6" />
+            </div>
+            <span className="font-black text-xl tracking-tighter uppercase">2026 수완하나중 스포츠 데이</span>
+          </div>
+          <div className="flex bg-indigo-900/50 rounded-full p-1 border border-white/10">
+            <NavBtn active={view === 'dashboard'} onClick={() => setView('dashboard')} icon={<LayoutDashboard size={18} />} label="대시보드" />
+            <NavBtn active={view === 'table'} onClick={() => setView('table')} icon={<ClipboardList size={18} />} label="현황판" />
+            <NavBtn active={view === 'admin'} onClick={() => setView('admin')} icon={<Settings size={18} />} label="채점" />
+          </div>
+        </div>
+      </nav>
+
+      <main className="max-w-6xl mx-auto px-4 py-6">
+        {/* 대시보드 뷰 */}
+        {view === 'dashboard' && (
+          <div className="grid gap-8 animate-in fade-in duration-500">
+            {GRADES.map(g => (
+              <section key={g.grade} className="space-y-4">
+                <div className="flex items-center gap-2 border-l-4 border-indigo-600 pl-3">
+                  <h2 className="text-xl font-black text-slate-800">{g.grade}학년 실시간 랭킹</h2>
+                  <TrendingUp className="text-indigo-400 w-5 h-5" />
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {stats
+                    .filter(s => s.grade === g.grade)
+                    .sort((a, b) => b.total - a.total)
+                    .slice(0, 3)
+                    .map((top, idx) => (
+                      <div key={top.id} className={`relative overflow-hidden p-5 rounded-3xl border-2 transition transform hover:scale-105 ${
+                        idx === 0 ? 'bg-amber-50 border-amber-200' : idx === 1 ? 'bg-slate-50 border-slate-200' : 'bg-orange-50 border-orange-200'
+                      }`}>
+                        <div className="absolute -right-4 -bottom-4 opacity-10">
+                          <Medal size={100} />
+                        </div>
+                        <div className="flex justify-between items-start mb-2">
+                          <span className={`px-2 py-1 rounded-full text-xs font-bold uppercase ${
+                            idx === 0 ? 'bg-amber-500 text-white' : idx === 1 ? 'bg-slate-400 text-white' : 'bg-orange-400 text-white'
+                          }`}>
+                            {idx + 1}위
+                          </span>
+                          <span className="text-2xl font-black text-slate-800">{top.classNum}반</span>
+                        </div>
+                        <div className="text-xl font-bold text-slate-900">{top.total.toLocaleString()} <span className="text-xs font-normal text-slate-500">점</span></div>
+                      </div>
+                    ))}
+                </div>
+
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 grid grid-cols-2 sm:grid-cols-5 md:grid-cols-11 gap-2">
+                  {stats
+                    .filter(s => s.grade === g.grade)
+                    .sort((a, b) => a.classNum - b.classNum)
+                    .map(s => (
+                      <div key={s.id} className="flex flex-col items-center p-2 rounded-xl bg-slate-50 hover:bg-indigo-50 transition border border-transparent hover:border-indigo-100">
+                        <span className="text-xs text-slate-400 font-bold">{s.classNum}반</span>
+                        <span className="text-sm font-black text-slate-700">{s.total}</span>
+                      </div>
+                    ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        )}
+
+        {/* 학년별로 구분된 현황판 뷰 */}
+        {view === 'table' && (
+          <div className="space-y-10 animate-in slide-in-from-right-4 duration-300">
+            {GRADES.map(g => (
+              <div key={g.grade} className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
+                <div className="p-5 bg-slate-800 text-white flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-indigo-500 p-2 rounded-lg">
+                      <Award className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold tracking-wider">{g.grade}학년 종합 점수 현황</h2>
+                      <p className="text-[10px] text-slate-400 mt-0.5 uppercase tracking-widest font-bold">Grade {g.grade} Scoreboard</p>
+                    </div>
+                  </div>
+                  <Sparkles className="text-amber-400 w-5 h-5 animate-pulse" />
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-center">
+                    <thead>
+                      <tr className="bg-slate-100 text-slate-600 font-bold border-b border-slate-200">
+                        <th className="p-3">반</th>
+                        {EVENTS.map(ev => (
+                          <th key={ev.id} className={`p-3 text-xs min-w-[90px] ${ev.id === 'cheer' ? 'bg-amber-50 text-amber-700' : ''}`}>
+                            {ev.name}
+                            <div className="text-[10px] font-normal opacity-60">
+                              {ev.type === 'rank' ? `(${ev.points[1]}점)` : '(직접입력)'}
+                            </div>
+                          </th>
+                        ))}
+                        <th className="p-3 bg-indigo-50 text-indigo-700 font-black">합계</th>
+                        <th className="p-3">순위</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {Array.from({ length: g.classes }).map((_, i) => {
+                        const classNum = i + 1;
+                        const data = stats.find(s => s.grade === g.grade && s.classNum === classNum);
+                        return (
+                          <tr key={data.id} className="hover:bg-slate-50 transition">
+                            <td className="p-3 font-bold text-slate-500 border-r border-slate-100">{classNum}반</td>
+                            {EVENTS.map(ev => (
+                              <td key={ev.id} className={`p-3 tabular-nums text-xs ${ev.id === 'cheer' ? 'bg-amber-50/30 font-bold' : 'text-slate-600'}`}>
+                                {data.breakdown[ev.id] || 0}
+                              </td>
+                            ))}
+                            <td className="p-3 font-black text-indigo-600 bg-indigo-50/30 tabular-nums">
+                              {data.total.toLocaleString()}
+                            </td>
+                            <td className="p-3">
+                              <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                                getRank(g.grade, data.total) === 1 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'
+                              }`}>
+                                {getRank(g.grade, data.total)}위
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 채점 뷰 */}
+        {view === 'admin' && (
+          <div className="space-y-6 max-w-6xl mx-auto animate-in slide-in-from-left-4 duration-300">
+             <div className="bg-indigo-600 text-white p-5 rounded-3xl shadow-lg flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold">실시간 채점 센터</h2>
+                  <p className="opacity-80 text-xs">종목별 순위 혹은 임의 점수를 입력하세요.</p>
+                </div>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={exportToJson}
+                    className="flex items-center gap-2 bg-white/20 hover:bg-white/30 px-3 py-2 rounded-xl text-xs font-bold transition"
+                    title="GitHub 업로드용 JSON 백업"
+                  >
+                    <Download size={14} />
+                    데이터 백업 (JSON)
+                  </button>
+                  <Settings className="w-8 h-8 opacity-30" />
+                </div>
+             </div>
+
+             {GRADES.map(g => (
+               <div key={g.grade} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                 <div className="p-3 bg-slate-50 border-b border-slate-200">
+                   <h3 className="font-bold text-slate-700 text-sm">{g.grade}학년 점수 입력</h3>
+                 </div>
+                 <div className="p-3 overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="text-xs text-slate-400 uppercase tracking-wider text-center">
+                          <th className="p-2 text-left">반</th>
+                          {EVENTS.map(ev => <th key={ev.id} className={`p-2 text-[11px] ${ev.id === 'cheer' ? 'text-amber-600 font-bold underline' : ''}`}>{ev.name}</th>)}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {Array.from({ length: g.classes }).map((_, i) => {
+                          const classNum = i + 1;
+                          const classData = scores[`${g.grade}-${classNum}`] || {};
+                          return (
+                            <tr key={classNum} className="hover:bg-slate-50 transition">
+                              <td className="p-2 font-bold text-slate-500 whitespace-nowrap text-sm">{classNum}반</td>
+                              {EVENTS.map(ev => (
+                                <td key={ev.id} className="p-1">
+                                  {ev.type === 'raw' ? (
+                                    <input
+                                      type="number"
+                                      placeholder="점수"
+                                      className="w-full p-2 rounded-lg bg-amber-50 border border-amber-100 focus:ring-2 focus:ring-amber-500 text-xs font-bold text-center outline-none"
+                                      value={classData[ev.id] ?? ""}
+                                      onChange={(e) => updateScore(g.grade, classNum, ev.id, e.target.value)}
+                                    />
+                                  ) : (
+                                    <select 
+                                      className="w-full p-2 rounded-lg bg-slate-100 border border-slate-200 focus:ring-2 focus:ring-indigo-500 text-xs font-bold text-center outline-none"
+                                      value={classData[ev.id] || ""}
+                                      onChange={(e) => updateScore(g.grade, classNum, ev.id, e.target.value)}
+                                    >
+                                      <option value="">-</option>
+                                      <option value="1">1위</option>
+                                      <option value="2">2위</option>
+                                      <option value="3">3위</option>
+                                      <option value="4">참가</option>
+                                    </select>
+                                  )}
+                                </td>
+                              ))}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                 </div>
+               </div>
+             ))}
+          </div>
+        )}
+      </main>
+
+      <footer className="mt-12 py-8 text-center border-t border-slate-200">
+        <a 
+          href="https://github.com/sungce/sportday.git" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 text-[10px] text-slate-400 hover:text-indigo-600 transition uppercase tracking-widest font-bold mb-2"
+        >
+          <Github size={14} />
+          GitHub Repository: sungce/sportday
+        </a>
+        <p className="text-[10px] text-slate-300">© 2026 Suwan Hana Middle School Sports Day</p>
+      </footer>
+    </div>
+  );
+}
+
+function NavBtn({ active, onClick, icon, label }) {
+  return (
+    <button 
+      onClick={onClick}
+      className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-300 ${
+        active 
+        ? 'bg-white text-indigo-700 shadow-lg scale-105 font-bold' 
+        : 'text-white/70 hover:text-white hover:bg-white/10'
+      }`}
+    >
+      {icon}
+      <span className="hidden sm:inline text-sm">{label}</span>
+    </button>
+  );
+}
