@@ -31,18 +31,7 @@
 </head>
 <body class="bg-slate-50 text-slate-900 pb-12">
 
-    <!-- Loading Overlay -->
-    <div id="loading" class="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center p-6 text-center">
-        <div id="loading-spinner" class="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-        <p id="loading-text" class="mt-4 text-indigo-600 font-medium animate-pulse">시스템 로딩 중...</p>
-        <div id="loading-error" class="hidden mt-4 space-y-4">
-            <p class="text-red-500 font-bold">데이터베이스 연결에 문제가 발생했습니다.</p>
-            <p class="text-sm text-slate-500">Firebase 인증 및 권한 설정을 확인해 주세요.<br>현재는 오프라인 모드로 확인하실 수 있습니다.</p>
-            <button onclick="forceStart()" class="px-6 py-2 bg-indigo-600 text-white rounded-full font-bold shadow-lg hover:bg-indigo-700 transition">
-                그대로 입장하기
-            </button>
-        </div>
-    </div>
+
 
     <!-- Admin Auth Modal -->
     <div id="admin-modal" class="fixed inset-0 bg-slate-900/50 z-[100] hidden flex-col items-center justify-center p-4 backdrop-blur-sm">
