@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2026 수완하나중 스포츠 데이</title>
+    <title id="page-title">2026 수완하나중 Sports Day 채점 현황</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
@@ -14,6 +14,19 @@
         input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         .fade-in { animation: fadeIn 0.5s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* 인쇄 전용 스타일 */
+        @media print {
+            body { background: white !important; color: black !important; padding: 0 !important; }
+            nav, footer, .print-hide { display: none !important; }
+            main { margin: 0 !important; padding: 0 !important; max-width: 100% !important; min-height: auto !important; }
+            .print-table-container { break-inside: avoid; margin-bottom: 2rem; }
+            table { border-collapse: collapse !important; width: 100% !important; }
+            th, td { border: 1px solid #cbd5e1 !important; color: black !important; padding: 0.5rem !important; }
+            th { background-color: #f1f5f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .print-bg { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .shadow-sm, .shadow-xl { box-shadow: none !important; }
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900 pb-12">
@@ -31,6 +44,27 @@
         </div>
     </div>
 
+    <!-- Admin Auth Modal -->
+    <div id="admin-modal" class="fixed inset-0 bg-slate-900/50 z-[100] hidden flex-col items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-sm transform transition-all">
+            <div class="flex items-center justify-center w-12 h-12 bg-indigo-100 rounded-full mb-4 mx-auto">
+                <i data-lucide="lock" class="w-6 h-6 text-indigo-600"></i>
+            </div>
+            <h3 class="text-xl font-bold text-center text-slate-800 mb-2">관리자 인증</h3>
+            <p class="text-sm text-center text-slate-500 mb-6">점수 입력 메뉴에 접근하려면 암호를 입력하세요.</p>
+            <div class="space-y-4">
+                <div>
+                    <input type="password" id="admin-password" onkeyup="if(event.key === 'Enter') verifyAdmin()" placeholder="암호 입력" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition text-center text-lg tracking-widest">
+                    <p id="admin-error" class="text-red-500 text-xs font-bold text-center mt-2 hidden">암호가 일치하지 않습니다.</p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="closeAdminModal()" class="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition">취소</button>
+                    <button onclick="verifyAdmin()" class="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition">확인</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Navigation -->
     <nav class="bg-indigo-700 text-white shadow-xl sticky top-0 z-50">
         <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -38,20 +72,28 @@
                 <div class="p-2 bg-white/20 rounded-lg">
                     <i data-lucide="trophy" class="w-6 h-6"></i>
                 </div>
-                <span class="font-black text-xl tracking-tighter uppercase">2026 수완하나중 스포츠 데이</span>
+                <span id="nav-title" class="font-black text-xl tracking-tighter uppercase whitespace-nowrap">2026 수완하나중 Sports Day 채점 현황</span>
             </div>
-            <div class="flex bg-indigo-900/50 rounded-full p-1 border border-white/10">
+            <div class="flex bg-indigo-900/50 rounded-full p-1 border border-white/10 overflow-x-auto hide-scrollbar">
                 <button onclick="switchView('dashboard')" id="btn-dashboard" class="nav-btn active flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-300 bg-white text-indigo-700 shadow-lg font-bold">
                     <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
-                    <span class="hidden sm:inline text-sm">대시보드</span>
+                    <span class="hidden sm:inline text-sm">채점 결과</span>
                 </button>
                 <button onclick="switchView('table')" id="btn-table" class="nav-btn flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-300 text-white/70 hover:text-white hover:bg-white/10">
                     <i data-lucide="clipboard-list" class="w-4 h-4"></i>
                     <span class="hidden sm:inline text-sm">현황판</span>
                 </button>
-                <button onclick="switchView('admin')" id="btn-admin" class="nav-btn flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-300 text-white/70 hover:text-white hover:bg-white/10">
+                <button onclick="attemptAdminAccess('admin')" id="btn-admin" class="nav-btn flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-300 text-white/70 hover:text-white hover:bg-white/10">
                     <i data-lucide="settings" class="w-4 h-4"></i>
-                    <span class="hidden sm:inline text-sm">채점</span>
+                    <span class="hidden sm:inline text-sm">점수 입력</span>
+                </button>
+                <button onclick="switchView('print')" id="btn-print" class="nav-btn flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-300 text-white/70 hover:text-white hover:bg-white/10">
+                    <i data-lucide="printer" class="w-4 h-4"></i>
+                    <span class="hidden sm:inline text-sm">출력</span>
+                </button>
+                <button onclick="attemptAdminAccess('settings')" id="btn-settings" class="nav-btn flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-300 text-white/70 hover:text-white hover:bg-white/10">
+                    <i data-lucide="sliders" class="w-4 h-4"></i>
+                    <span class="hidden sm:inline text-sm">설정</span>
                 </button>
             </div>
         </div>
@@ -62,11 +104,7 @@
     </main>
 
     <footer class="mt-12 py-8 text-center border-t border-slate-200">
-        <a href="https://github.com/sungce/sportday.git" target="_blank" class="inline-flex items-center gap-2 text-[10px] text-slate-400 hover:text-indigo-600 transition uppercase tracking-widest font-bold mb-2">
-            <i data-lucide="github" class="w-3.5 h-3.5"></i>
-            GitHub Repository: sungce/sportday
-        </a>
-        <p class="text-[10px] text-slate-300">© 2026 Suwan Hana Middle School Sports Day</p>
+        <p id="footer-text" class="text-[10px] text-slate-300">© 2026 수완하나중</p>
     </footer>
 
     <!-- Firebase SDKs -->
@@ -92,22 +130,30 @@
         window.scores = {};
         window.currentView = 'dashboard';
         window.currentUser = null;
+        window.isAdminAuthed = false;
+        window.pendingAdminView = 'admin';
 
-        // --- Constants ---
-        const EVENTS = [
-            { id: 'tug', name: '줄다리기', type: 'rank', points: { 1: 600, 2: 500, 3: 400, base: 300 } },
-            { id: 'sixLeg', name: '5인 6각', type: 'rank', points: { 1: 600, 2: 500, 3: 400, base: 300 } },
-            { id: 'jump8', name: '8자 마라톤 줄넘기', type: 'rank', points: { 1: 500, 2: 400, 3: 300, base: 200 } },
-            { id: 'longRope', name: '긴줄 함께뛰기', type: 'rank', points: { 1: 400, 2: 300, 3: 200, base: 100 } },
-            { id: 'relay', name: '이어달리기', type: 'rank', points: { 1: 400, 2: 300, 3: 200, base: 100 } },
-            { id: 'cheer', name: '기타(응원상)', type: 'raw' }
-        ];
+        // --- Constants & Config ---
+        const ADMIN_PWD = "suwan123";
 
-        const GRADES = [
-            { grade: 1, classes: 10 },
-            { grade: 2, classes: 10 },
-            { grade: 3, classes: 11 }
-        ];
+        // 초기 기본 설정값 (DB에서 불러오기 전)
+        window.appConfig = {
+            year: "2026",
+            schoolName: "수완하나중",
+            GRADES: [
+                { grade: 1, classes: 10 },
+                { grade: 2, classes: 10 },
+                { grade: 3, classes: 11 }
+            ],
+            EVENTS: [
+                { id: 'tug', name: '줄다리기', type: 'rank', points: { 1: 600, 2: 500, 3: 400, base: 300 } },
+                { id: 'sixLeg', name: '5인 6각', type: 'rank', points: { 1: 600, 2: 500, 3: 400, base: 300 } },
+                { id: 'jump8', name: '8자 마라톤 줄넘기', type: 'rank', points: { 1: 500, 2: 400, 3: 300, base: 200 } },
+                { id: 'longRope', name: '긴줄 함께뛰기', type: 'rank', points: { 1: 400, 2: 300, 3: 200, base: 100 } },
+                { id: 'relay', name: '이어달리기', type: 'rank', points: { 1: 400, 2: 300, 3: 200, base: 100 } },
+                { id: 'cheer', name: '기타(응원상)', type: 'raw' }
+            ]
+        };
 
         // --- Initialize ---
         window.onload = async () => {
@@ -137,6 +183,7 @@
                     if (user) {
                         window.currentUser = user;
                         clearTimeout(timeout);
+                        listenToConfig();
                         listenToScores();
                     }
                 });
@@ -156,9 +203,39 @@
             render();
         };
 
+        window.updateTitles = () => {
+            const year = window.appConfig.year || "2026";
+            const schoolName = window.appConfig.schoolName || "수완하나중";
+            const fullTitle = `${year} ${schoolName} Sports Day 채점 현황`;
+            
+            const pageTitle = document.getElementById('page-title');
+            if (pageTitle) pageTitle.innerText = fullTitle;
+            
+            const navTitle = document.getElementById('nav-title');
+            if (navTitle) navTitle.innerText = fullTitle;
+            
+            const footerText = document.getElementById('footer-text');
+            if (footerText) footerText.innerText = `© ${year} ${schoolName}`;
+        };
+
+        function listenToConfig() {
+            if (!window.currentUser) return;
+            const q = doc(db, 'artifacts', appId, 'public', 'data', 'config', 'main');
+            onSnapshot(q, (docSnap) => {
+                if (docSnap.exists()) {
+                    window.appConfig = docSnap.data();
+                } else {
+                    setDoc(q, window.appConfig); // DB에 초기값 생성
+                }
+                window.updateTitles();
+                render();
+            }, (err) => {
+                console.error("Config Listen Error:", err);
+            });
+        }
+
         function listenToScores() {
             if (!window.currentUser) return;
-            
             const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'scores'));
             onSnapshot(q, (snapshot) => {
                 window.scores = {};
@@ -169,7 +246,6 @@
                 document.getElementById('loading').classList.add('hidden');
             }, (err) => {
                 console.error("Firestore Listen Error:", err);
-                // 권한 오류 시 사용자에게 알림 또는 오프라인 렌더링
                 render();
                 document.getElementById('loading').classList.add('hidden');
             });
@@ -178,14 +254,14 @@
         // --- Logic & Rendering ---
         function calculateStats() {
             const results = [];
-            GRADES.forEach(g => {
+            window.appConfig.GRADES.forEach(g => {
                 for (let c = 1; c <= g.classes; c++) {
                     const id = `${g.grade}-${c}`;
                     const classData = window.scores[id] || {};
                     let total = 0;
                     const breakdown = {};
 
-                    EVENTS.forEach(ev => {
+                    window.appConfig.EVENTS.forEach(ev => {
                         const val = classData[ev.id];
                         let p = 0;
                         if (ev.type === 'raw') {
@@ -220,7 +296,85 @@
             render();
         };
 
+        window.attemptAdminAccess = (targetView) => {
+            if (window.isAdminAuthed) {
+                window.switchView(targetView);
+            } else {
+                window.pendingAdminView = targetView;
+                document.getElementById('admin-password').value = '';
+                document.getElementById('admin-error').classList.add('hidden');
+                document.getElementById('admin-modal').classList.remove('hidden');
+                document.getElementById('admin-modal').classList.add('flex');
+                setTimeout(() => document.getElementById('admin-password').focus(), 100);
+            }
+        };
+
+        window.closeAdminModal = () => {
+            document.getElementById('admin-modal').classList.add('hidden');
+            document.getElementById('admin-modal').classList.remove('flex');
+        };
+
+        window.verifyAdmin = () => {
+            const pwd = document.getElementById('admin-password').value;
+            if (pwd === ADMIN_PWD) {
+                window.isAdminAuthed = true;
+                window.closeAdminModal();
+                window.switchView(window.pendingAdminView);
+            } else {
+                document.getElementById('admin-error').classList.remove('hidden');
+                document.getElementById('admin-password').value = '';
+                document.getElementById('admin-password').focus();
+            }
+        };
+
+        window.showResetConfirm = () => {
+            document.getElementById('reset-confirm').classList.remove('hidden');
+        };
+
+        window.hideResetConfirm = () => {
+            document.getElementById('reset-confirm').classList.add('hidden');
+        };
+
+        window.executeReset = async () => {
+            if (!window.isAdminAuthed) return;
+            
+            document.getElementById('loading').classList.remove('hidden');
+            
+            // 모든 점수 초기화 로직
+            for (const docId of Object.keys(window.scores)) {
+                const parts = docId.split('-');
+                if(parts.length === 2) {
+                    const grade = parseInt(parts[0]);
+                    const classNum = parseInt(parts[1]);
+                    window.scores[docId] = { grade, classNum }; // 빈 데이터로 덮어쓰기
+                    
+                    if (db && window.currentUser) {
+                        try {
+                            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'scores', docId), {
+                                grade, classNum, lastUpdated: Date.now()
+                            });
+                        } catch(e) {
+                            console.error("초기화 실패:", e);
+                        }
+                    }
+                }
+            }
+            
+            document.getElementById('loading').classList.add('hidden');
+            window.switchView('dashboard');
+        };
+
+        window.logoutAdmin = () => {
+            window.isAdminAuthed = false;
+            window.switchView('dashboard');
+        };
+
         window.updateScore = async (grade, classNum, eventId, value) => {
+            if (!window.isAdminAuthed) {
+                console.warn("권한이 없어 점수를 업데이트할 수 없습니다.");
+                return;
+            }
+
             const docId = `${grade}-${classNum}`;
             const currentData = window.scores[docId] || { grade, classNum };
             const finalValue = value === "" ? null : (isNaN(value) ? value : parseInt(value));
@@ -240,6 +394,106 @@
             }
         };
 
+        // 설정 전용 헬퍼 함수들
+        window.togglePoints = (selectEl) => {
+            const tr = selectEl.closest('tr');
+            const inputs = tr.querySelectorAll('.points-input');
+            if (selectEl.value === 'raw') {
+                inputs.forEach(input => { input.disabled = true; input.classList.add('bg-slate-100', 'text-transparent'); });
+            } else {
+                inputs.forEach(input => { input.disabled = false; input.classList.remove('bg-slate-100', 'text-transparent'); });
+            }
+        };
+
+        window.addEventRow = () => {
+            const tbody = document.getElementById('config-events-tbody');
+            const tr = document.createElement('tr');
+            tr.className = "cfg-event-row border-b border-slate-100 hover:bg-slate-50 transition-colors";
+            const newId = 'ev_' + Date.now();
+            tr.dataset.id = newId;
+            tr.innerHTML = `
+                <td class="p-2"><input type="text" class="cfg-ev-name w-full p-2 border border-slate-200 rounded text-sm outline-none focus:border-indigo-500" placeholder="종목명"></td>
+                <td class="p-2">
+                    <select class="cfg-ev-type w-full p-2 border border-slate-200 rounded text-sm outline-none focus:border-indigo-500" onchange="window.togglePoints(this)">
+                        <option value="rank">순위제</option>
+                        <option value="raw">점수입력</option>
+                    </select>
+                </td>
+                <td class="p-2"><input type="number" class="cfg-ev-p1 w-full p-2 border border-slate-200 rounded text-sm points-input outline-none focus:border-indigo-500" placeholder="1위"></td>
+                <td class="p-2"><input type="number" class="cfg-ev-p2 w-full p-2 border border-slate-200 rounded text-sm points-input outline-none focus:border-indigo-500" placeholder="2위"></td>
+                <td class="p-2"><input type="number" class="cfg-ev-p3 w-full p-2 border border-slate-200 rounded text-sm points-input outline-none focus:border-indigo-500" placeholder="3위"></td>
+                <td class="p-2"><input type="number" class="cfg-ev-pb w-full p-2 border border-slate-200 rounded text-sm points-input outline-none focus:border-indigo-500" placeholder="기본"></td>
+                <td class="p-2 text-center">
+                    <button onclick="this.closest('tr').remove()" class="p-2 text-red-500 hover:bg-red-50 rounded-lg transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+            lucide.createIcons();
+        };
+
+        window.saveConfig = async () => {
+            if(!window.isAdminAuthed) return;
+            
+            const btn = document.getElementById('save-config-btn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<div class="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto"></div>';
+            
+            const newConfig = {
+                year: document.getElementById('cfg-year').value || new Date().getFullYear().toString(),
+                schoolName: document.getElementById('cfg-school').value || '학교',
+                GRADES: [
+                    { grade: 1, classes: parseInt(document.getElementById('cfg-g1').value) || 0 },
+                    { grade: 2, classes: parseInt(document.getElementById('cfg-g2').value) || 0 },
+                    { grade: 3, classes: parseInt(document.getElementById('cfg-g3').value) || 0 }
+                ],
+                EVENTS: []
+            };
+            
+            const eventRows = document.querySelectorAll('.cfg-event-row');
+            eventRows.forEach((row, index) => {
+                const id = row.dataset.id || ('ev_' + Date.now() + '_' + index);
+                const name = row.querySelector('.cfg-ev-name').value;
+                const type = row.querySelector('.cfg-ev-type').value;
+                
+                if(!name.trim()) return; // 이름이 비어있으면 저장 무시
+                
+                if(type === 'rank') {
+                    newConfig.EVENTS.push({
+                        id, name, type,
+                        points: {
+                            1: parseInt(row.querySelector('.cfg-ev-p1').value) || 0,
+                            2: parseInt(row.querySelector('.cfg-ev-p2').value) || 0,
+                            3: parseInt(row.querySelector('.cfg-ev-p3').value) || 0,
+                            base: parseInt(row.querySelector('.cfg-ev-pb').value) || 0
+                        }
+                    });
+                } else {
+                    newConfig.EVENTS.push({ id, name, type });
+                }
+            });
+
+            window.appConfig = newConfig;
+            window.updateTitles();
+            
+            if(db && window.currentUser) {
+                try {
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'main'), newConfig);
+                    const toast = document.getElementById('save-toast');
+                    toast.classList.remove('opacity-0', 'pointer-events-none');
+                    toast.classList.add('opacity-100');
+                    setTimeout(() => {
+                        toast.classList.add('opacity-0', 'pointer-events-none');
+                        toast.classList.remove('opacity-100');
+                    }, 3000);
+                } catch(e) {
+                    console.error("설정 저장 실패:", e);
+                }
+            }
+            
+            btn.innerHTML = originalText;
+            render(); // 화면 갱신
+        };
+
         function render() {
             const stats = calculateStats();
             const container = document.getElementById('content');
@@ -248,7 +502,7 @@
             div.className = "fade-in";
 
             if (window.currentView === 'dashboard') {
-                GRADES.forEach(g => {
+                window.appConfig.GRADES.forEach(g => {
                     const gradeStats = stats.filter(s => s.grade === g.grade).sort((a,b) => b.total - a.total);
                     let html = `
                         <section class="mb-10 space-y-4">
@@ -283,7 +537,7 @@
                     div.innerHTML += html;
                 });
             } else if (window.currentView === 'table') {
-                GRADES.forEach(g => {
+                window.appConfig.GRADES.forEach(g => {
                     let html = `
                         <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 mb-10">
                             <div class="p-5 bg-slate-800 text-white flex justify-between items-center">
@@ -294,7 +548,7 @@
                                     <thead>
                                         <tr class="bg-slate-100 text-slate-600 font-bold border-b border-slate-200">
                                             <th class="p-3">반</th>
-                                            ${EVENTS.map(ev => `<th class="p-3 text-xs min-w-[90px] ${ev.id === 'cheer' ? 'bg-amber-50 text-amber-700' : ''}">${ev.name}</th>`).join('')}
+                                            ${window.appConfig.EVENTS.map(ev => `<th class="p-3 text-xs min-w-[90px] ${ev.id === 'cheer' ? 'bg-amber-50 text-amber-700' : ''}">${ev.name}</th>`).join('')}
                                             <th class="p-3 bg-indigo-50 text-indigo-700 font-black">합계</th>
                                             <th class="p-3">순위</th>
                                         </tr>
@@ -306,7 +560,7 @@
                         html += `
                             <tr class="hover:bg-slate-50">
                                 <td class="p-3 font-bold text-slate-500 border-r border-slate-100">${s.classNum}반</td>
-                                ${EVENTS.map(ev => `<td class="p-3 text-xs ${ev.id === 'cheer' ? 'bg-amber-50/30 font-bold' : 'text-slate-600'}">${s.breakdown[ev.id] || 0}</td>`).join('')}
+                                ${window.appConfig.EVENTS.map(ev => `<td class="p-3 text-xs ${ev.type === 'raw' ? 'bg-amber-50/30 font-bold' : 'text-slate-600'}">${s.breakdown[ev.id] || 0}</td>`).join('')}
                                 <td class="p-3 font-black text-indigo-600 bg-indigo-50/30">${s.total.toLocaleString()}</td>
                                 <td class="p-3"><span class="px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100">${getRank(g.grade, s.total, stats)}위</span></td>
                             </tr>
@@ -315,13 +569,69 @@
                     html += `</tbody></table></div></div>`;
                     div.innerHTML += html;
                 });
+            } else if (window.currentView === 'print') {
+                div.innerHTML = `
+                    <div class="print-hide flex flex-col sm:flex-row justify-between items-center mb-6 bg-indigo-50 p-5 rounded-2xl border border-indigo-100 gap-4">
+                        <div>
+                            <h2 class="text-lg font-bold text-indigo-900">점수표 인쇄 미리보기</h2>
+                            <p class="text-sm text-indigo-600">A4 용지 세로 방향에 최적화되어 있습니다.</p>
+                        </div>
+                        <button onclick="window.print()" class="px-6 py-2.5 bg-indigo-600 text-white rounded-full font-bold shadow-lg hover:bg-indigo-700 transition flex items-center gap-2">
+                            <i data-lucide="printer" class="w-5 h-5"></i> 인쇄하기
+                        </button>
+                    </div>
+                    
+                    <div id="print-area" class="bg-white p-6 sm:p-10 rounded-2xl shadow-sm border border-slate-200">
+                        <h1 class="text-3xl font-black text-center mb-8 text-slate-800 border-b-2 border-slate-800 pb-4">
+                            ${window.appConfig.year || "2026"} ${window.appConfig.schoolName || "수완하나중"} Sports Day 최종 결과
+                        </h1>
+                `;
+
+                window.appConfig.GRADES.forEach(g => {
+                    const gradeData = stats.filter(s => s.grade === g.grade);
+                    // 인쇄 시에는 반 순서대로 정렬하여 보기 좋게 표시
+                    gradeData.sort((a, b) => a.classNum - b.classNum);
+
+                    let html = `
+                        <div class="print-table-container mb-8">
+                            <h2 class="text-xl font-bold mb-3 text-slate-800 border-l-4 border-slate-800 pl-3">${g.grade}학년 점수 현황</h2>
+                            <table class="w-full text-sm text-center border-collapse border border-slate-300">
+                                <thead>
+                                    <tr class="bg-slate-100 text-slate-700 font-bold print-bg">
+                                        <th class="p-2 border border-slate-300">반</th>
+                                        ${window.appConfig.EVENTS.map(ev => `<th class="p-2 border border-slate-300">${ev.name}</th>`).join('')}
+                                        <th class="p-2 border border-slate-300 bg-slate-200 print-bg">총점</th>
+                                        <th class="p-2 border border-slate-300 bg-slate-200 print-bg">순위</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                    `;
+                    gradeData.forEach(s => {
+                        html += `
+                            <tr>
+                                <td class="p-2 border border-slate-300 font-bold text-slate-700">${s.classNum}반</td>
+                                ${window.appConfig.EVENTS.map(ev => `<td class="p-2 border border-slate-300">${s.breakdown[ev.id] || 0}</td>`).join('')}
+                                <td class="p-2 border border-slate-300 font-black text-slate-800 bg-slate-50 print-bg">${s.total.toLocaleString()}</td>
+                                <td class="p-2 border border-slate-300 font-bold text-slate-800 bg-slate-50 print-bg">${getRank(g.grade, s.total, stats)}위</td>
+                            </tr>
+                        `;
+                    });
+                    html += `</tbody></table></div>`;
+                    div.innerHTML += html;
+                });
+                div.innerHTML += `</div>`;
             } else if (window.currentView === 'admin') {
+                if (!window.isAdminAuthed) {
+                    window.switchView('dashboard');
+                    return;
+                }
+
                 div.innerHTML = `
                     <div class="bg-indigo-600 text-white p-5 rounded-3xl shadow-lg flex items-center justify-between mb-6">
-                        <h2 class="text-lg font-bold">실시간 채점 센터</h2>
+                        <h2 class="text-lg font-bold">실시간 점수 입력 센터</h2>
                     </div>
                 `;
-                GRADES.forEach(g => {
+                window.appConfig.GRADES.forEach(g => {
                     let html = `
                         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-6">
                             <div class="p-3 bg-slate-50 border-b font-bold text-sm">${g.grade}학년 점수 입력</div>
@@ -329,14 +639,14 @@
                                 <table class="w-full">
                                     <thead><tr class="text-[10px] text-slate-400 uppercase text-center">
                                         <th class="p-2 text-left">반</th>
-                                        ${EVENTS.map(ev => `<th class="p-2">${ev.name}</th>`).join('')}
+                                        ${window.appConfig.EVENTS.map(ev => `<th class="p-2 min-w-[80px]">${ev.name}</th>`).join('')}
                                     </tr></thead>
                                     <tbody class="divide-y">
                     `;
                     for (let c = 1; c <= g.classes; c++) {
                         const classScores = window.scores[`${g.grade}-${c}`] || {};
                         html += `<tr><td class="p-2 font-bold text-slate-500 text-sm">${c}반</td>`;
-                        EVENTS.forEach(ev => {
+                        window.appConfig.EVENTS.forEach(ev => {
                             if (ev.type === 'raw') {
                                 html += `<td class="p-1">
                                     <input type="number" onchange="window.updateScore(${g.grade}, ${c}, '${ev.id}', this.value)" 
@@ -361,6 +671,159 @@
                     html += `</tbody></table></div></div>`;
                     div.innerHTML += html;
                 });
+            } else if (window.currentView === 'settings') {
+                if (!window.isAdminAuthed) {
+                    window.switchView('dashboard');
+                    return;
+                }
+
+                // 종목 행 동적 렌더링
+                let eventsRowsHtml = window.appConfig.EVENTS.map(ev => `
+                    <tr class="cfg-event-row border-b border-slate-100 hover:bg-slate-50 transition-colors" data-id="${ev.id}">
+                        <td class="p-2"><input type="text" class="cfg-ev-name w-full p-2 border border-slate-200 rounded text-sm outline-none focus:border-indigo-500" value="${ev.name}"></td>
+                        <td class="p-2">
+                            <select class="cfg-ev-type w-full p-2 border border-slate-200 rounded text-sm outline-none focus:border-indigo-500" onchange="window.togglePoints(this)">
+                                <option value="rank" ${ev.type === 'rank' ? 'selected' : ''}>순위제</option>
+                                <option value="raw" ${ev.type === 'raw' ? 'selected' : ''}>점수입력</option>
+                            </select>
+                        </td>
+                        <td class="p-2"><input type="number" class="cfg-ev-p1 w-full p-2 border border-slate-200 rounded text-sm points-input outline-none focus:border-indigo-500 ${ev.type === 'raw' ? 'bg-slate-100 text-transparent' : ''}" value="${ev.points?.[1] || ''}" ${ev.type === 'raw' ? 'disabled' : ''}></td>
+                        <td class="p-2"><input type="number" class="cfg-ev-p2 w-full p-2 border border-slate-200 rounded text-sm points-input outline-none focus:border-indigo-500 ${ev.type === 'raw' ? 'bg-slate-100 text-transparent' : ''}" value="${ev.points?.[2] || ''}" ${ev.type === 'raw' ? 'disabled' : ''}></td>
+                        <td class="p-2"><input type="number" class="cfg-ev-p3 w-full p-2 border border-slate-200 rounded text-sm points-input outline-none focus:border-indigo-500 ${ev.type === 'raw' ? 'bg-slate-100 text-transparent' : ''}" value="${ev.points?.[3] || ''}" ${ev.type === 'raw' ? 'disabled' : ''}></td>
+                        <td class="p-2"><input type="number" class="cfg-ev-pb w-full p-2 border border-slate-200 rounded text-sm points-input outline-none focus:border-indigo-500 ${ev.type === 'raw' ? 'bg-slate-100 text-transparent' : ''}" value="${ev.points?.base || ''}" ${ev.type === 'raw' ? 'disabled' : ''}></td>
+                        <td class="p-2 text-center">
+                            <button onclick="this.closest('tr').remove()" class="p-2 text-red-500 hover:bg-red-50 rounded-lg transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </td>
+                    </tr>
+                `).join('');
+
+                div.innerHTML = `
+                    <div class="bg-indigo-600 text-white p-5 rounded-3xl shadow-lg flex items-center justify-between mb-6">
+                        <div class="flex items-center gap-3">
+                            <i data-lucide="sliders" class="w-6 h-6"></i>
+                            <h2 class="text-lg font-bold">관리자 설정</h2>
+                        </div>
+                        <button id="save-config-btn" onclick="window.saveConfig()" class="px-5 py-2 bg-white text-indigo-700 rounded-full font-bold shadow hover:bg-indigo-50 transition flex items-center justify-center min-w-[100px]">
+                            설정 저장
+                        </button>
+                    </div>
+                    
+                    <div class="space-y-6 relative">
+                        <!-- 저장 완료 토스트 알림 -->
+                        <div id="save-toast" class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-4 px-4 py-2 bg-slate-800 text-white text-sm font-bold rounded-full shadow-lg opacity-0 pointer-events-none transition-opacity duration-300 z-10">
+                            설정이 성공적으로 저장되었습니다!
+                        </div>
+
+                        <!-- 기본 정보 설정 -->
+                        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div class="p-4 bg-slate-50 border-b border-slate-100 font-bold text-slate-800 flex items-center gap-2">
+                                <i data-lucide="info" class="w-4 h-4 text-indigo-500"></i> 기본 정보 설정
+                            </div>
+                            <div class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 mb-2">행사 연도</label>
+                                    <input type="text" id="cfg-year" value="${window.appConfig.year || ''}" placeholder="예: 2026" class="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 font-bold text-slate-700">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 mb-2">학교 이름</label>
+                                    <input type="text" id="cfg-school" value="${window.appConfig.schoolName || ''}" placeholder="예: 수완하나중" class="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 font-bold text-slate-700">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 학급 수 설정 -->
+                        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div class="p-4 bg-slate-50 border-b border-slate-100 font-bold text-slate-800 flex items-center gap-2">
+                                <i data-lucide="users" class="w-4 h-4 text-indigo-500"></i> 학급 수 설정
+                            </div>
+                            <div class="p-5 grid grid-cols-1 sm:grid-cols-3 gap-6">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 mb-2">1학년 반 수</label>
+                                    <input type="number" id="cfg-g1" value="${window.appConfig.GRADES.find(g=>g.grade===1)?.classes || 0}" class="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 font-bold text-slate-700">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 mb-2">2학년 반 수</label>
+                                    <input type="number" id="cfg-g2" value="${window.appConfig.GRADES.find(g=>g.grade===2)?.classes || 0}" class="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 font-bold text-slate-700">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 mb-2">3학년 반 수</label>
+                                    <input type="number" id="cfg-g3" value="${window.appConfig.GRADES.find(g=>g.grade===3)?.classes || 0}" class="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 font-bold text-slate-700">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 종목 및 배점 설정 -->
+                        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div class="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                                <div class="font-bold text-slate-800 flex items-center gap-2">
+                                    <i data-lucide="medal" class="w-4 h-4 text-indigo-500"></i> 종목 및 배점 설정
+                                </div>
+                                <button onclick="window.addEventRow()" class="px-3 py-1.5 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 rounded-lg text-xs font-bold transition flex items-center gap-1">
+                                    <i data-lucide="plus" class="w-3.5 h-3.5"></i> 종목 추가
+                                </button>
+                            </div>
+                            <div class="p-2 overflow-x-auto">
+                                <table class="w-full text-left min-w-[700px]">
+                                    <thead>
+                                        <tr class="text-[11px] text-slate-400 uppercase bg-slate-50/50">
+                                            <th class="p-3 w-1/4">종목명</th>
+                                            <th class="p-3 w-32">채점 방식</th>
+                                            <th class="p-3 w-20">1위</th>
+                                            <th class="p-3 w-20">2위</th>
+                                            <th class="p-3 w-20">3위</th>
+                                            <th class="p-3 w-20">기본/참가</th>
+                                            <th class="p-3 w-12 text-center">삭제</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="config-events-tbody" class="divide-y divide-slate-100">
+                                        ${eventsRowsHtml}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="p-4 bg-amber-50 border-t border-amber-100 text-xs text-amber-700 font-medium">
+                                <span class="font-bold">💡 채점 방식 안내:</span> '순위제'는 등수별 점수를 일괄 부여하며, '점수입력'은 현장에서 직접 득점 점수(응원상 등)를 타이핑할 때 사용합니다.
+                            </div>
+                        </div>
+
+                        <!-- 데이터 초기화 설정 -->
+                        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div class="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div>
+                                    <h3 class="text-lg font-bold text-slate-800">모든 데이터 초기화</h3>
+                                    <p class="text-sm text-slate-500">모든 학급의 점수 및 순위 데이터를 0으로 초기화합니다.</p>
+                                </div>
+                                <button onclick="window.showResetConfirm()" class="shrink-0 px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 rounded-xl font-bold transition">
+                                    초기화 진행
+                                </button>
+                            </div>
+                            <div id="reset-confirm" class="hidden p-5 bg-red-50 border-t border-red-100 transition-all">
+                                <div class="flex items-start gap-3">
+                                    <i data-lucide="alert-triangle" class="w-5 h-5 text-red-600 shrink-0 mt-0.5"></i>
+                                    <div>
+                                        <p class="text-red-700 font-bold mb-3">정말로 모든 점수 데이터를 초기화하시겠습니까? 이 작업은 복구할 수 없습니다.</p>
+                                        <div class="flex gap-2">
+                                            <button onclick="window.executeReset()" class="px-5 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition shadow-sm">네, 초기화합니다</button>
+                                            <button onclick="window.hideResetConfirm()" class="px-5 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg font-bold hover:bg-slate-50 transition">취소</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 로그아웃 설정 -->
+                        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div class="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div>
+                                    <h3 class="text-lg font-bold text-slate-800">관리자 로그아웃</h3>
+                                    <p class="text-sm text-slate-500">점수 입력 및 설정 모드를 종료하고 채점 결과 화면으로 돌아갑니다.</p>
+                                </div>
+                                <button onclick="window.logoutAdmin()" class="shrink-0 px-4 py-2 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-xl font-bold transition">
+                                    로그아웃
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
             }
             container.appendChild(div);
             lucide.createIcons();
