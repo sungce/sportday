@@ -145,47 +145,50 @@
         };
 
         // --- Initialize ---
-        window.onload = async () => {
-            lucide.createIcons();
+        // --- Initialize ---
+window.onload = async () => {
+    lucide.createIcons();
 
-            const timeout = setTimeout(() => {
-                if (!window.currentUser) {
-                    document.getElementById('loading-spinner').classList.add('hidden');
-                    document.getElementById('loading-text').classList.add('hidden');
-                    document.getElementById('loading-error').classList.remove('hidden');
-                }
-            }, 8000);
+    const timeout = setTimeout(() => {
+        if (!window.currentUser) {
+            document.getElementById('loading-spinner')?.classList.add('hidden');
+            document.getElementById('loading-text')?.classList.add('hidden');
+            document.getElementById('loading-error')?.classList.remove('hidden');
+        }
+    }, 8000);
 
-            if (!firebaseConfig.apiKey && typeof __firebase_config === 'undefined') {
-                console.warn("Firebase 설정이 없습니다. 오프라인 모드로 실행합니다.");
-                render();
-                return;
+    if (!firebaseConfig.apiKey && typeof __firebase_config === 'undefined') {
+        console.warn("Firebase 설정이 없습니다. 오프라인 모드로 실행합니다.");
+        render();
+        document.getElementById('loading')?.classList.add('hidden');  // ← 추가
+        return;
+    }
+
+    try {
+        const app = initializeApp(firebaseConfig);
+        auth = getAuth(app);
+        db = getFirestore(app);
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                window.currentUser = user;
+                clearTimeout(timeout);
+                listenToConfig();
+                listenToScores();
             }
+        });
 
-            try {
-                const app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                db = getFirestore(app);
-
-                // 권한 오류 해결을 위한 인증 흐름 개선
-                onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        window.currentUser = user;
-                        clearTimeout(timeout);
-                        listenToConfig();
-                        listenToScores();
-                    }
-                });
-
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (err) {
-                console.error("Firebase 초기화 실패:", err);
-            }
-        };
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+            await signInAnonymously(auth);
+        }
+    } catch (err) {
+        console.error("Firebase 초기화 실패:", err);
+        render();  // ← 실패해도 렌더링
+        document.getElementById('loading')?.classList.add('hidden');  // ← 로딩 숨기기
+    }
+};
 
         window.forceStart = () => {
             document.getElementById('loading').classList.add('hidden');
