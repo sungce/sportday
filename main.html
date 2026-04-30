@@ -541,354 +541,407 @@
                     currentConfigGrades.forEach(g => {
                         const gradeStats = stats.filter(s => s.grade === g.grade).sort((a,b) => b.total - a.total);
                         let html = `
-                    `;
-                    gradeStats.slice(0, 3).forEach((top, idx) => {
-                        const bg = idx === 0 ? 'bg-amber-50 border-amber-200' : idx === 1 ? 'bg-slate-50 border-slate-200' : 'bg-orange-50 border-orange-200';
-                        const badge = idx === 0 ? 'bg-amber-500' : idx === 1 ? 'bg-slate-400' : 'bg-orange-400';
-                        html += `
-                            <div class="relative overflow-hidden p-5 rounded-3xl border-2 transition transform hover:scale-105 ${bg}">
-                                <div class="flex justify-between items-start mb-2">
-                                    <span class="px-2 py-1 rounded-full text-xs font-bold text-white uppercase ${badge}">${idx+1}위</span>
-                                    <span class="text-2xl font-black text-slate-800">${top.classNum}반</span>
+                            <section class="mb-14">
+                                <div class="flex items-center gap-3 mb-6">
+                                    <div class="w-1.5 h-8 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-full"></div>
+                                    <h2 class="text-2xl font-black text-slate-800 tracking-tight">${g.grade}학년 <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">리더보드</span></h2>
                                 </div>
-                                <div class="text-xl font-bold text-slate-900">${(top.total || 0).toLocaleString()} <span class="text-xs font-normal text-slate-500">점</span></div>
-                            </div>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                         `;
-                    });
-                    html += `</div><div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 grid grid-cols-2 sm:grid-cols-5 md:grid-cols-11 gap-2">`;
-                    gradeStats.sort((a,b) => a.classNum - b.classNum).forEach(s => {
-                        html += `
-                            <div class="flex flex-col items-center p-2 rounded-xl bg-slate-50 border border-transparent">
-                                <span class="text-xs text-slate-400 font-bold">${s.classNum}반</span>
-                                <span class="text-sm font-black text-slate-700">${s.total || 0}</span>
-                            </div>
-                        `;
-                    });
-                    html += `</div></section>`;
-                    div.innerHTML += html;
-                });
-            } else if (window.currentView === 'table') {
-                currentConfigGrades.forEach(g => {
-                    let html = `
-                        <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 mb-10">
-                            <div class="p-5 bg-slate-800 text-white flex justify-between items-center">
-                                <h2 class="text-lg font-bold tracking-wider">${g.grade}학년 종합 점수 현황</h2>
-                            </div>
-                            <div class="overflow-x-auto">
-                                <table class="w-full text-sm text-center">
-                                    <thead>
-                                        <tr class="bg-slate-100 text-slate-600 font-bold border-b border-slate-200">
-                                            <th class="p-3">반</th>
-                                            ${currentConfigEvents.map(ev => `<th class="p-3 text-xs min-w-[90px] ${ev.id === 'cheer' ? 'bg-amber-50 text-amber-700' : ''}">${ev.name}</th>`).join('')}
-                                            <th class="p-3 bg-blue-50 text-blue-700 font-black">합계</th>
-                                            <th class="p-3">순위</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-slate-100">
-                    `;
-                    const gradeData = stats.filter(s => s.grade === g.grade);
-                    gradeData.forEach(s => {
-                        html += `
-                            <tr class="hover:bg-slate-50">
-                                <td class="p-3 font-bold text-slate-500 border-r border-slate-100">${s.classNum}반</td>
-                                ${currentConfigEvents.map(ev => `<td class="p-3 text-xs ${ev.type === 'raw' ? 'bg-amber-50/30 font-bold' : 'text-slate-600'}">${s.breakdown[ev.id] || 0}</td>`).join('')}
-                                <td class="p-3 font-black text-blue-600 bg-blue-50/30">${(s.total || 0).toLocaleString()}</td>
-                                <td class="p-3"><span class="px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100">${getRank(g.grade, s.total, stats)}위</span></td>
-                            </tr>
-                        `;
-                    });
-                    html += `</tbody></table></div></div>`;
-                    div.innerHTML += html;
-                });
-            } else if (window.currentView === 'print') {
-                div.innerHTML = `
-                    <div class="print-hide flex flex-col sm:flex-row justify-between items-center mb-6 bg-blue-50 p-5 rounded-2xl border border-blue-100 gap-4">
-                        <div>
-                            <h2 class="text-lg font-bold text-blue-900">점수표 인쇄 미리보기</h2>
-                            <p class="text-sm text-blue-600">A4 용지 세로 방향에 최적화되어 있습니다.</p>
-                        </div>
-                        <button onclick="window.print()" class="px-6 py-2.5 bg-blue-600 text-white rounded-full font-bold shadow-lg hover:bg-blue-700 transition flex items-center gap-2">
-                            <i data-lucide="printer" class="w-5 h-5"></i> 인쇄하기
-                        </button>
-                    </div>
-                    
-                    <div id="print-area" class="bg-white p-6 sm:p-10 rounded-2xl shadow-sm border border-slate-200">
-                        <h1 class="text-3xl font-black text-center mb-8 text-slate-800 border-b-2 border-slate-800 pb-4">
-                            ${window.appConfig?.year || "2026"} ${window.appConfig?.schoolName || "수완하나중"} Sports Day 최종 결과
-                        </h1>
-                `;
-
-                currentConfigGrades.forEach(g => {
-                    const gradeData = stats.filter(s => s.grade === g.grade);
-                    // 인쇄 시에는 반 순서대로 정렬하여 보기 좋게 표시
-                    gradeData.sort((a, b) => a.classNum - b.classNum);
-
-                    let html = `
-                        <div class="print-table-container mb-8">
-                            <h2 class="text-xl font-bold mb-3 text-slate-800 border-l-4 border-slate-800 pl-3">${g.grade}학년 점수 현황</h2>
-                            <table class="w-full text-sm text-center border-collapse border border-slate-300">
-                                <thead>
-                                    <tr class="bg-slate-100 text-slate-700 font-bold print-bg">
-                                        <th class="p-2 border border-slate-300">반</th>
-                                        ${currentConfigEvents.map(ev => `<th class="p-2 border border-slate-300">${ev.name}</th>`).join('')}
-                                        <th class="p-2 border border-slate-300 bg-slate-200 print-bg">총점</th>
-                                        <th class="p-2 border border-slate-300 bg-slate-200 print-bg">순위</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                    `;
-                    gradeData.forEach(s => {
-                        html += `
-                            <tr>
-                                <td class="p-2 border border-slate-300 font-bold text-slate-700">${s.classNum}반</td>
-                                ${currentConfigEvents.map(ev => `<td class="p-2 border border-slate-300">${s.breakdown[ev.id] || 0}</td>`).join('')}
-                                <td class="p-2 border border-slate-300 font-black text-slate-800 bg-slate-50 print-bg">${(s.total || 0).toLocaleString()}</td>
-                                <td class="p-2 border border-slate-300 font-bold text-slate-800 bg-slate-50 print-bg">${getRank(g.grade, s.total, stats)}위</td>
-                            </tr>
-                        `;
-                    });
-                    html += `</tbody></table></div>`;
-                    div.innerHTML += html;
-                });
-                div.innerHTML += `</div>`;
-            } else if (window.currentView === 'admin') {
-                if (!window.isAdminAuthed) {
-                    window.switchView('dashboard');
-                    return;
-                }
-
-                div.innerHTML = `
-                    <div class="bg-blue-600 text-white p-5 rounded-3xl shadow-lg flex items-center justify-between mb-6">
-                        <h2 class="text-lg font-bold">실시간 점수 입력 센터</h2>
-                    </div>
-                `;
-                currentConfigGrades.forEach(g => {
-                    let html = `
-                        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-6">
-                            <div class="p-3 bg-slate-50 border-b font-bold text-sm">${g.grade}학년 점수 입력</div>
-                            <div class="p-3 overflow-x-auto">
-                                <table class="w-full">
-                                    <thead><tr class="text-[10px] text-slate-400 uppercase text-center">
-                                        <th class="p-2 text-left">반</th>
-                                        ${currentConfigEvents.map(ev => `<th class="p-2 min-w-[80px]">${ev.name}</th>`).join('')}
-                                    </tr></thead>
-                                    <tbody class="divide-y">
-                    `;
-                    for (let c = 1; c <= g.classes; c++) {
-                        const classScores = window.scores[`${g.grade}-${c}`] || {};
-                        html += `<tr><td class="p-2 font-bold text-slate-500 text-sm">${c}반</td>`;
-                        currentConfigEvents.forEach(ev => {
-                            if (ev.type === 'raw') {
-                                html += `<td class="p-1">
-                                    <input type="number" onchange="window.updateScore(${g.grade}, ${c}, '${ev.id}', this.value)" 
-                                        value="${classScores[ev.id] ?? ''}" placeholder="점수"
-                                        class="w-full p-2 rounded-lg bg-amber-50 border border-amber-100 text-xs font-bold text-center outline-none focus:ring-2 focus:ring-amber-500">
-                                </td>`;
+                        
+                        // Top 3 Cards
+                        gradeStats.slice(0, 3).forEach((top, idx) => {
+                            let bg, badgeBg, iconColor, textColor;
+                            if (idx === 0) {
+                                bg = 'bg-gradient-to-br from-yellow-50 via-amber-50 to-yellow-100 border border-yellow-200 shadow-lg shadow-yellow-900/10';
+                                badgeBg = 'bg-gradient-to-br from-yellow-400 to-amber-500';
+                                iconColor = 'text-yellow-500';
+                                textColor = 'text-amber-700';
+                            } else if (idx === 1) {
+                                bg = 'bg-gradient-to-br from-slate-50 via-gray-50 to-slate-200 border border-slate-200 shadow-md shadow-slate-900/5';
+                                badgeBg = 'bg-gradient-to-br from-slate-400 to-gray-500';
+                                iconColor = 'text-slate-400';
+                                textColor = 'text-slate-700';
                             } else {
-                                html += `<td class="p-1">
-                                    <select onchange="window.updateScore(${g.grade}, ${c}, '${ev.id}', this.value)"
-                                        class="w-full p-2 rounded-lg bg-slate-100 border border-slate-200 text-xs font-bold text-center outline-none focus:ring-2 focus:ring-blue-500">
-                                        <option value="">-</option>
-                                        <option value="1" ${classScores[ev.id] == 1 ? 'selected' : ''}>1위</option>
-                                        <option value="2" ${classScores[ev.id] == 2 ? 'selected' : ''}>2위</option>
-                                        <option value="3" ${classScores[ev.id] == 3 ? 'selected' : ''}>3위</option>
-                                        <option value="4" ${classScores[ev.id] == 4 ? 'selected' : ''}>참가</option>
-                                    </select>
-                                </td>`;
+                                bg = 'bg-gradient-to-br from-orange-50 via-amber-50 to-orange-100 border border-orange-200 shadow-md shadow-orange-900/5';
+                                badgeBg = 'bg-gradient-to-br from-orange-400 to-amber-500';
+                                iconColor = 'text-orange-400';
+                                textColor = 'text-orange-700';
                             }
+
+                            html += `
+                                <div class="relative overflow-hidden p-6 rounded-[2rem] transition-all duration-300 transform hover:-translate-y-1.5 hover:shadow-xl ${bg}">
+                                    <div class="absolute -right-6 -bottom-6 opacity-10 transform rotate-12">
+                                        <i data-lucide="award" class="w-40 h-40 ${iconColor}"></i>
+                                    </div>
+                                    <div class="relative z-10 flex flex-col h-full">
+                                        <div class="flex justify-between items-start mb-6">
+                                            <span class="flex items-center justify-center w-10 h-10 rounded-2xl ${badgeBg} text-white font-black text-lg shadow-md">${idx+1}</span>
+                                            <div class="p-2 bg-white/50 rounded-full backdrop-blur-sm border border-white/50 shadow-sm">
+                                                <i data-lucide="crown" class="w-6 h-6 ${iconColor}"></i>
+                                            </div>
+                                        </div>
+                                        <div class="mt-auto">
+                                            <div class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-1">Rank ${idx+1}</div>
+                                            <div class="flex items-baseline gap-2 mb-1">
+                                                <span class="text-4xl font-black text-slate-800 tracking-tighter">${top.classNum}</span>
+                                                <span class="text-xl font-bold text-slate-600">반</span>
+                                            </div>
+                                            <div class="text-2xl font-black ${textColor}">${(top.total || 0).toLocaleString()} <span class="text-base font-bold opacity-70">점</span></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
                         });
-                        html += `</tr>`;
-                    }
-                    html += `</tbody></table></div></div>`;
-                    div.innerHTML += html;
-                });
-            } else if (window.currentView === 'settings') {
-                if (!window.isAdminAuthed) {
-                    window.switchView('dashboard');
-                    return;
-                }
 
-                // 종목 행 동적 렌더링
-                let eventsRowsHtml = currentConfigEvents.map(ev => `
-                    <tr class="cfg-event-row border-b border-slate-100 hover:bg-slate-50 transition-colors" data-id="${ev.id}">
-                        <td class="p-2"><input type="text" class="cfg-ev-name w-full p-2 border border-slate-200 rounded text-sm outline-none focus:border-blue-500" value="${ev.name}"></td>
-                        <td class="p-2">
-                            <select class="cfg-ev-type w-full p-2 border border-slate-200 rounded text-sm outline-none focus:border-blue-500" onchange="window.togglePoints(this)">
-                                <option value="rank" ${ev.type === 'rank' ? 'selected' : ''}>순위제</option>
-                                <option value="raw" ${ev.type === 'raw' ? 'selected' : ''}>점수입력</option>
-                            </select>
-                        </td>
-                        <td class="p-2"><input type="number" class="cfg-ev-p1 w-full p-2 border border-slate-200 rounded text-sm points-input outline-none focus:border-blue-500 ${ev.type === 'raw' ? 'bg-slate-100 text-transparent' : ''}" value="${ev.points?.[1] || ''}" ${ev.type === 'raw' ? 'disabled' : ''}></td>
-                        <td class="p-2"><input type="number" class="cfg-ev-p2 w-full p-2 border border-slate-200 rounded text-sm points-input outline-none focus:border-blue-500 ${ev.type === 'raw' ? 'bg-slate-100 text-transparent' : ''}" value="${ev.points?.[2] || ''}" ${ev.type === 'raw' ? 'disabled' : ''}></td>
-                        <td class="p-2"><input type="number" class="cfg-ev-p3 w-full p-2 border border-slate-200 rounded text-sm points-input outline-none focus:border-blue-500 ${ev.type === 'raw' ? 'bg-slate-100 text-transparent' : ''}" value="${ev.points?.[3] || ''}" ${ev.type === 'raw' ? 'disabled' : ''}></td>
-                        <td class="p-2"><input type="number" class="cfg-ev-pb w-full p-2 border border-slate-200 rounded text-sm points-input outline-none focus:border-blue-500 ${ev.type === 'raw' ? 'bg-slate-100 text-transparent' : ''}" value="${ev.points?.base || ''}" ${ev.type === 'raw' ? 'disabled' : ''}></td>
-                        <td class="p-2 text-center">
-                            <button onclick="this.closest('tr').remove()" class="p-2 text-red-500 hover:bg-red-50 rounded-lg transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                        </td>
-                    </tr>
-                `).join('');
-
-                div.innerHTML = `
-                    <div class="bg-blue-600 text-white p-5 rounded-3xl shadow-lg flex items-center justify-between mb-6">
-                        <div class="flex items-center gap-3">
-                            <i data-lucide="sliders" class="w-6 h-6"></i>
-                            <h2 class="text-lg font-bold">관리자 설정</h2>
-                        </div>
-                        <button id="save-config-btn" onclick="window.saveConfig()" class="px-5 py-2 bg-white text-blue-700 rounded-full font-bold shadow hover:bg-blue-50 transition flex items-center justify-center min-w-[100px]">
-                            설정 저장
-                        </button>
-                    </div>
-                    
-                    <div class="space-y-6 relative">
-                        <!-- 저장 완료 토스트 알림 -->
-                        <div id="save-toast" class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-4 px-4 py-2 bg-slate-800 text-white text-sm font-bold rounded-full shadow-lg opacity-0 pointer-events-none transition-opacity duration-300 z-10">
-                            설정이 성공적으로 저장되었습니다!
-                        </div>
-
-                        <!-- 기본 정보 설정 -->
-                        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                            <div class="p-4 bg-slate-50 border-b border-slate-100 font-bold text-slate-800 flex items-center gap-2">
-                                <i data-lucide="info" class="w-4 h-4 text-blue-500"></i> 기본 정보 설정
+                        html += `
                             </div>
-                            <div class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-6">
-                                <div>
-                            <label class="block text-xs font-bold text-slate-500 mb-2">행사 연도</label>
-                            <input type="text" id="cfg-year" value="${window.appConfig?.year || ''}" placeholder="예: 2026" class="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-bold text-slate-700">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-500 mb-2">학교 이름</label>
-                            <input type="text" id="cfg-school" value="${window.appConfig?.schoolName || ''}" placeholder="예: 수완하나중" class="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-bold text-slate-700">
-                        </div>
-                                <div>
-                            <label class="block text-xs font-bold text-slate-500 mb-2">1학년 반 수</label>
-                            <input type="number" id="cfg-g1" value="${currentConfigGrades.find(g=>g.grade===1)?.classes || 0}" class="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-bold text-slate-700">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-500 mb-2">2학년 반 수</label>
-                            <input type="number" id="cfg-g2" value="${currentConfigGrades.find(g=>g.grade===2)?.classes || 0}" class="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-bold text-slate-700">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-500 mb-2">3학년 반 수</label>
-                            <input type="number" id="cfg-g3" value="${currentConfigGrades.find(g=>g.grade===3)?.classes || 0}" class="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-bold text-slate-700">
-                        </div>
-                            </div>
-                        </div>
-
-                        <!-- 학급 수 설정 -->
-                        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                            <div class="p-4 bg-slate-50 border-b border-slate-100 font-bold text-slate-800 flex items-center gap-2">
-                                <i data-lucide="users" class="w-4 h-4 text-blue-500"></i> 학급 수 설정
-                            </div>
-                            <div class="p-5 grid grid-cols-1 sm:grid-cols-3 gap-6">
-                                <div>
-                                    <label class="block text-xs font-bold text-slate-500 mb-2">1학년 반 수</label>
-                                    <input type="number" id="cfg-g1" value="${window.appConfig.GRADES.find(g=>g.grade===1)?.classes || 0}" class="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-bold text-slate-700">
+                            <div class="bg-white rounded-[2rem] shadow-sm border border-slate-200 p-6 sm:p-8">
+                                <div class="flex items-center gap-2 mb-6">
+                                    <i data-lucide="bar-chart-2" class="w-5 h-5 text-slate-400"></i>
+                                    <h3 class="text-sm font-bold text-slate-500 uppercase tracking-wider">전체 학급 점수 현황</h3>
                                 </div>
-                                <div>
-                                    <label class="block text-xs font-bold text-slate-500 mb-2">2학년 반 수</label>
-                                    <input type="number" id="cfg-g2" value="${window.appConfig.GRADES.find(g=>g.grade===2)?.classes || 0}" class="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-bold text-slate-700">
+                                <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-11 gap-3 sm:gap-4">
+                        `;
+                        
+                        // Remaining Classes Grid
+                        gradeStats.sort((a,b) => a.classNum - b.classNum).forEach(s => {
+                            const rank = getRank(g.grade, s.total, stats);
+                            let rankStyle = rank <= 3 ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500';
+                            
+                            html += `
+                                <div class="group flex flex-col items-center justify-center py-4 px-2 rounded-2xl bg-slate-50 border border-slate-100 hover:bg-blue-50 hover:border-blue-200 hover:shadow-md transition-all duration-300 cursor-default">
+                                    <span class="text-sm font-bold text-slate-500 group-hover:text-blue-600 mb-1">${s.classNum}반</span>
+                                    <span class="text-xl font-black text-slate-800 group-hover:text-blue-700 mb-2">${(s.total || 0).toLocaleString()}</span>
+                                    <span class="text-[10px] font-black px-2.5 py-1 rounded-lg transition-colors ${rankStyle} group-hover:bg-blue-200 group-hover:text-blue-800">${rank}위</span>
                                 </div>
-                                <div>
-                                    <label class="block text-xs font-bold text-slate-500 mb-2">3학년 반 수</label>
-                                    <input type="number" id="cfg-g3" value="${window.appConfig.GRADES.find(g=>g.grade===3)?.classes || 0}" class="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-bold text-slate-700">
+                            `;
+                        });
+                        html += `</div></div></section>`;
+                        div.innerHTML += html;
+                    });
+                } else if (window.currentView === 'table') {
+                    currentConfigGrades.forEach(g => {
+                        let html = `
+                            <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 mb-10">
+                                <div class="p-5 bg-slate-800 text-white flex justify-between items-center">
+                                    <h2 class="text-lg font-bold tracking-wider">${g.grade}학년 종합 점수 현황</h2>
                                 </div>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-sm text-center">
+                                        <thead>
+                                            <tr class="bg-slate-100 text-slate-600 font-bold border-b border-slate-200">
+                                                <th class="p-3">반</th>
+                                                ${currentConfigEvents.map(ev => `<th class="p-3 text-xs min-w-[90px] ${ev.id === 'cheer' ? 'bg-amber-50 text-amber-700' : ''}">${ev.name}</th>`).join('')}
+                                                <th class="p-3 bg-blue-50 text-blue-700 font-black">합계</th>
+                                                <th class="p-3">순위</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-100">
+                        `;
+                        const gradeData = stats.filter(s => s.grade === g.grade);
+                        gradeData.forEach(s => {
+                            html += `
+                                <tr class="hover:bg-slate-50">
+                                    <td class="p-3 font-bold text-slate-500 border-r border-slate-100">${s.classNum}반</td>
+                                    ${currentConfigEvents.map(ev => `<td class="p-3 text-xs ${ev.type === 'raw' ? 'bg-amber-50/30 font-bold' : 'text-slate-600'}">${s.breakdown[ev.id] || 0}</td>`).join('')}
+                                    <td class="p-3 font-black text-blue-600 bg-blue-50/30">${(s.total || 0).toLocaleString()}</td>
+                                    <td class="p-3"><span class="px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100">${getRank(g.grade, s.total, stats)}위</span></td>
+                                </tr>
+                            `;
+                        });
+                        html += `</tbody></table></div></div>`;
+                        div.innerHTML += html;
+                    });
+                } else if (window.currentView === 'print') {
+                    div.innerHTML = `
+                        <div class="print-hide flex flex-col sm:flex-row justify-between items-center mb-6 bg-blue-50 p-5 rounded-2xl border border-blue-100 gap-4">
+                            <div>
+                                <h2 class="text-lg font-bold text-blue-900">점수표 인쇄 미리보기</h2>
+                                <p class="text-sm text-blue-600">A4 용지 세로 방향에 최적화되어 있습니다.</p>
                             </div>
+                            <button onclick="window.print()" class="px-6 py-2.5 bg-blue-600 text-white rounded-full font-bold shadow-lg hover:bg-blue-700 transition flex items-center gap-2">
+                                <i data-lucide="printer" class="w-5 h-5"></i> 인쇄하기
+                            </button>
                         </div>
+                        
+                        <div id="print-area" class="bg-white p-6 sm:p-10 rounded-2xl shadow-sm border border-slate-200">
+                            <h1 class="text-3xl font-black text-center mb-8 text-slate-800 border-b-2 border-slate-800 pb-4">
+                                ${window.appConfig?.year || "2026"} ${window.appConfig?.schoolName || "수완하나중"} Sports Day 최종 결과
+                            </h1>
+                    `;
 
-                        <!-- 종목 및 배점 설정 -->
-                        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                            <div class="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                                <div class="font-bold text-slate-800 flex items-center gap-2">
-                                    <i data-lucide="medal" class="w-4 h-4 text-blue-500"></i> 종목 및 배점 설정
-                                </div>
-                                <button onclick="window.addEventRow()" class="px-3 py-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg text-xs font-bold transition flex items-center gap-1">
-                                    <i data-lucide="plus" class="w-3.5 h-3.5"></i> 종목 추가
-                                </button>
-                            </div>
-                            <div class="p-2 overflow-x-auto">
-                                <table class="w-full text-left min-w-[700px]">
+                    currentConfigGrades.forEach(g => {
+                        const gradeData = stats.filter(s => s.grade === g.grade);
+                        // 인쇄 시에는 반 순서대로 정렬하여 보기 좋게 표시
+                        gradeData.sort((a, b) => a.classNum - b.classNum);
+
+                        let html = `
+                            <div class="print-table-container mb-8">
+                                <h2 class="text-xl font-bold mb-3 text-slate-800 border-l-4 border-slate-800 pl-3">${g.grade}학년 점수 현황</h2>
+                                <table class="w-full text-sm text-center border-collapse border border-slate-300">
                                     <thead>
-                                        <tr class="text-[11px] text-slate-400 uppercase bg-slate-50/50">
-                                            <th class="p-3 w-1/4">종목명</th>
-                                            <th class="p-3 w-32">채점 방식</th>
-                                            <th class="p-3 w-20">1위</th>
-                                            <th class="p-3 w-20">2위</th>
-                                            <th class="p-3 w-20">3위</th>
-                                            <th class="p-3 w-20">기본/참가</th>
-                                            <th class="p-3 w-12 text-center">삭제</th>
+                                        <tr class="bg-slate-100 text-slate-700 font-bold print-bg">
+                                            <th class="p-2 border border-slate-300">반</th>
+                                            ${currentConfigEvents.map(ev => `<th class="p-2 border border-slate-300">${ev.name}</th>`).join('')}
+                                            <th class="p-2 border border-slate-300 bg-slate-200 print-bg">총점</th>
+                                            <th class="p-2 border border-slate-300 bg-slate-200 print-bg">순위</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="config-events-tbody" class="divide-y divide-slate-100">
-                                        ${eventsRowsHtml}
-                                    </tbody>
-                                </table>
-                            </div>
-                            <div class="p-4 bg-amber-50 border-t border-amber-100 text-xs text-amber-700 font-medium">
-                                <span class="font-bold">💡 채점 방식 안내:</span> '순위제'는 등수별 점수를 일괄 부여하며, '점수입력'은 현장에서 직접 득점 점수(응원상 등)를 타이핑할 때 사용합니다.
-                            </div>
-                        </div>
+                                    <tbody>
+                        `;
+                        gradeData.forEach(s => {
+                            html += `
+                                <tr>
+                                    <td class="p-2 border border-slate-300 font-bold text-slate-700">${s.classNum}반</td>
+                                    ${currentConfigEvents.map(ev => `<td class="p-2 border border-slate-300">${s.breakdown[ev.id] || 0}</td>`).join('')}
+                                    <td class="p-2 border border-slate-300 font-black text-slate-800 bg-slate-50 print-bg">${(s.total || 0).toLocaleString()}</td>
+                                    <td class="p-2 border border-slate-300 font-bold text-slate-800 bg-slate-50 print-bg">${getRank(g.grade, s.total, stats)}위</td>
+                                </tr>
+                            `;
+                        });
+                        html += `</tbody></table></div>`;
+                        div.innerHTML += html;
+                    });
+                    div.innerHTML += `</div>`;
+                } else if (window.currentView === 'admin') {
+                    if (!window.isAdminAuthed) {
+                        window.switchView('dashboard');
+                        return;
+                    }
 
-                        <!-- 데이터 초기화 설정 -->
-                        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                            <div class="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                <div>
-                                    <h3 class="text-lg font-bold text-slate-800">모든 데이터 초기화</h3>
-                                    <p class="text-sm text-slate-500">모든 학급의 점수 및 순위 데이터를 0으로 초기화합니다.</p>
-                                </div>
-                                <button onclick="window.showResetConfirm()" class="shrink-0 px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 rounded-xl font-bold transition">
-                                    초기화 진행
-                                </button>
+                    div.innerHTML = `
+                        <div class="bg-blue-600 text-white p-5 rounded-3xl shadow-lg flex items-center justify-between mb-6">
+                            <h2 class="text-lg font-bold">실시간 점수 입력 센터</h2>
+                        </div>
+                    `;
+                    currentConfigGrades.forEach(g => {
+                        let html = `
+                            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-6">
+                                <div class="p-3 bg-slate-50 border-b font-bold text-sm">${g.grade}학년 점수 입력</div>
+                                <div class="p-3 overflow-x-auto">
+                                    <table class="w-full">
+                                        <thead><tr class="text-[10px] text-slate-400 uppercase text-center">
+                                            <th class="p-2 text-left">반</th>
+                                            ${currentConfigEvents.map(ev => `<th class="p-2 min-w-[80px]">${ev.name}</th>`).join('')}
+                                        </tr></thead>
+                                        <tbody class="divide-y">
+                        `;
+                        for (let c = 1; c <= g.classes; c++) {
+                            const classScores = window.scores[`${g.grade}-${c}`] || {};
+                            html += `<tr><td class="p-2 font-bold text-slate-500 text-sm">${c}반</td>`;
+                            currentConfigEvents.forEach(ev => {
+                                if (ev.type === 'raw') {
+                                    html += `<td class="p-1">
+                                        <input type="number" onchange="window.updateScore(${g.grade}, ${c}, '${ev.id}', this.value)" 
+                                            value="${classScores[ev.id] ?? ''}" placeholder="점수"
+                                            class="w-full p-2 rounded-lg bg-amber-50 border border-amber-100 text-xs font-bold text-center outline-none focus:ring-2 focus:ring-amber-500">
+                                    </td>`;
+                                } else {
+                                    html += `<td class="p-1">
+                                        <select onchange="window.updateScore(${g.grade}, ${c}, '${ev.id}', this.value)"
+                                            class="w-full p-2 rounded-lg bg-slate-100 border border-slate-200 text-xs font-bold text-center outline-none focus:ring-2 focus:ring-blue-500">
+                                            <option value="">-</option>
+                                            <option value="1" ${classScores[ev.id] == 1 ? 'selected' : ''}>1위</option>
+                                            <option value="2" ${classScores[ev.id] == 2 ? 'selected' : ''}>2위</option>
+                                            <option value="3" ${classScores[ev.id] == 3 ? 'selected' : ''}>3위</option>
+                                            <option value="4" ${classScores[ev.id] == 4 ? 'selected' : ''}>참가</option>
+                                        </select>
+                                    </td>`;
+                                }
+                            });
+                            html += `</tr>`;
+                        }
+                        html += `</tbody></table></div></div>`;
+                        div.innerHTML += html;
+                    });
+                } else if (window.currentView === 'settings') {
+                    if (!window.isAdminAuthed) {
+                        window.switchView('dashboard');
+                        return;
+                    }
+
+                    // 종목 행 동적 렌더링
+                    let eventsRowsHtml = currentConfigEvents.map(ev => `
+                        <tr class="cfg-event-row border-b border-slate-100 hover:bg-slate-50 transition-colors" data-id="${ev.id}">
+                            <td class="p-2"><input type="text" class="cfg-ev-name w-full p-2 border border-slate-200 rounded text-sm outline-none focus:border-blue-500" value="${ev.name}"></td>
+                            <td class="p-2">
+                                <select class="cfg-ev-type w-full p-2 border border-slate-200 rounded text-sm outline-none focus:border-blue-500" onchange="window.togglePoints(this)">
+                                    <option value="rank" ${ev.type === 'rank' ? 'selected' : ''}>순위제</option>
+                                    <option value="raw" ${ev.type === 'raw' ? 'selected' : ''}>점수입력</option>
+                                </select>
+                            </td>
+                            <td class="p-2"><input type="number" class="cfg-ev-p1 w-full p-2 border border-slate-200 rounded text-sm points-input outline-none focus:border-blue-500 ${ev.type === 'raw' ? 'bg-slate-100 text-transparent' : ''}" value="${ev.points?.[1] || ''}" ${ev.type === 'raw' ? 'disabled' : ''}></td>
+                            <td class="p-2"><input type="number" class="cfg-ev-p2 w-full p-2 border border-slate-200 rounded text-sm points-input outline-none focus:border-blue-500 ${ev.type === 'raw' ? 'bg-slate-100 text-transparent' : ''}" value="${ev.points?.[2] || ''}" ${ev.type === 'raw' ? 'disabled' : ''}></td>
+                            <td class="p-2"><input type="number" class="cfg-ev-p3 w-full p-2 border border-slate-200 rounded text-sm points-input outline-none focus:border-blue-500 ${ev.type === 'raw' ? 'bg-slate-100 text-transparent' : ''}" value="${ev.points?.[3] || ''}" ${ev.type === 'raw' ? 'disabled' : ''}></td>
+                            <td class="p-2"><input type="number" class="cfg-ev-pb w-full p-2 border border-slate-200 rounded text-sm points-input outline-none focus:border-blue-500 ${ev.type === 'raw' ? 'bg-slate-100 text-transparent' : ''}" value="${ev.points?.base || ''}" ${ev.type === 'raw' ? 'disabled' : ''}></td>
+                            <td class="p-2 text-center">
+                                <button onclick="this.closest('tr').remove()" class="p-2 text-red-500 hover:bg-red-50 rounded-lg transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                            </td>
+                        </tr>
+                    `).join('');
+
+                    div.innerHTML = `
+                        <div class="bg-blue-600 text-white p-5 rounded-3xl shadow-lg flex items-center justify-between mb-6">
+                            <div class="flex items-center gap-3">
+                                <i data-lucide="sliders" class="w-6 h-6"></i>
+                                <h2 class="text-lg font-bold">관리자 설정</h2>
                             </div>
-                            <div id="reset-confirm" class="hidden p-5 bg-red-50 border-t border-red-100 transition-all">
-                                <div class="flex items-start gap-3">
-                                    <i data-lucide="alert-triangle" class="w-5 h-5 text-red-600 shrink-0 mt-0.5"></i>
+                            <button id="save-config-btn" onclick="window.saveConfig()" class="px-5 py-2 bg-white text-blue-700 rounded-full font-bold shadow hover:bg-blue-50 transition flex items-center justify-center min-w-[100px]">
+                                설정 저장
+                            </button>
+                        </div>
+                        
+                        <div class="space-y-6 relative">
+                            <!-- 저장 완료 토스트 알림 -->
+                            <div id="save-toast" class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-4 px-4 py-2 bg-slate-800 text-white text-sm font-bold rounded-full shadow-lg opacity-0 pointer-events-none transition-opacity duration-300 z-10">
+                                설정이 성공적으로 저장되었습니다!
+                            </div>
+
+                            <!-- 기본 정보 설정 -->
+                            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                                <div class="p-4 bg-slate-50 border-b border-slate-100 font-bold text-slate-800 flex items-center gap-2">
+                                    <i data-lucide="info" class="w-4 h-4 text-blue-500"></i> 기본 정보 설정
+                                </div>
+                                <div class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-6">
                                     <div>
-                                        <p class="text-red-700 font-bold mb-3">정말로 모든 점수 데이터를 초기화하시겠습니까? 이 작업은 복구할 수 없습니다.</p>
-                                        <div class="flex gap-2">
-                                            <button onclick="window.executeReset()" class="px-5 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition shadow-sm">네, 초기화합니다</button>
-                                            <button onclick="window.hideResetConfirm()" class="px-5 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg font-bold hover:bg-slate-50 transition">취소</button>
+                                <label class="block text-xs font-bold text-slate-500 mb-2">행사 연도</label>
+                                <input type="text" id="cfg-year" value="${window.appConfig?.year || ''}" placeholder="예: 2026" class="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-bold text-slate-700">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 mb-2">학교 이름</label>
+                                <input type="text" id="cfg-school" value="${window.appConfig?.schoolName || ''}" placeholder="예: 수완하나중" class="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-bold text-slate-700">
+                            </div>
+                                    <div>
+                                <label class="block text-xs font-bold text-slate-500 mb-2">1학년 반 수</label>
+                                <input type="number" id="cfg-g1" value="${currentConfigGrades.find(g=>g.grade===1)?.classes || 0}" class="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-bold text-slate-700">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 mb-2">2학년 반 수</label>
+                                <input type="number" id="cfg-g2" value="${currentConfigGrades.find(g=>g.grade===2)?.classes || 0}" class="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-bold text-slate-700">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 mb-2">3학년 반 수</label>
+                                <input type="number" id="cfg-g3" value="${currentConfigGrades.find(g=>g.grade===3)?.classes || 0}" class="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-bold text-slate-700">
+                            </div>
+                                </div>
+                            </div>
+
+                            <!-- 학급 수 설정 -->
+                            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                                <div class="p-4 bg-slate-50 border-b border-slate-100 font-bold text-slate-800 flex items-center gap-2">
+                                    <i data-lucide="users" class="w-4 h-4 text-blue-500"></i> 학급 수 설정
+                                </div>
+                                <div class="p-5 grid grid-cols-1 sm:grid-cols-3 gap-6">
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-500 mb-2">1학년 반 수</label>
+                                        <input type="number" id="cfg-g1" value="${window.appConfig.GRADES.find(g=>g.grade===1)?.classes || 0}" class="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-bold text-slate-700">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-500 mb-2">2학년 반 수</label>
+                                        <input type="number" id="cfg-g2" value="${window.appConfig.GRADES.find(g=>g.grade===2)?.classes || 0}" class="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-bold text-slate-700">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-500 mb-2">3학년 반 수</label>
+                                        <input type="number" id="cfg-g3" value="${window.appConfig.GRADES.find(g=>g.grade===3)?.classes || 0}" class="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-bold text-slate-700">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 종목 및 배점 설정 -->
+                            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                                <div class="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                                    <div class="font-bold text-slate-800 flex items-center gap-2">
+                                        <i data-lucide="medal" class="w-4 h-4 text-blue-500"></i> 종목 및 배점 설정
+                                    </div>
+                                    <button onclick="window.addEventRow()" class="px-3 py-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg text-xs font-bold transition flex items-center gap-1">
+                                        <i data-lucide="plus" class="w-3.5 h-3.5"></i> 종목 추가
+                                    </button>
+                                </div>
+                                <div class="p-2 overflow-x-auto">
+                                    <table class="w-full text-left min-w-[700px]">
+                                        <thead>
+                                            <tr class="text-[11px] text-slate-400 uppercase bg-slate-50/50">
+                                                <th class="p-3 w-1/4">종목명</th>
+                                                <th class="p-3 w-32">채점 방식</th>
+                                                <th class="p-3 w-20">1위</th>
+                                                <th class="p-3 w-20">2위</th>
+                                                <th class="p-3 w-20">3위</th>
+                                                <th class="p-3 w-20">기본/참가</th>
+                                                <th class="p-3 w-12 text-center">삭제</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="config-events-tbody" class="divide-y divide-slate-100">
+                                            ${eventsRowsHtml}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="p-4 bg-amber-50 border-t border-amber-100 text-xs text-amber-700 font-medium">
+                                    <span class="font-bold">💡 채점 방식 안내:</span> '순위제'는 등수별 점수를 일괄 부여하며, '점수입력'은 현장에서 직접 득점 점수(응원상 등)를 타이핑할 때 사용합니다.
+                                </div>
+                            </div>
+
+                            <!-- 데이터 초기화 설정 -->
+                            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                                <div class="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                    <div>
+                                        <h3 class="text-lg font-bold text-slate-800">모든 데이터 초기화</h3>
+                                        <p class="text-sm text-slate-500">모든 학급의 점수 및 순위 데이터를 0으로 초기화합니다.</p>
+                                    </div>
+                                    <button onclick="window.showResetConfirm()" class="shrink-0 px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 rounded-xl font-bold transition">
+                                        초기화 진행
+                                    </button>
+                                </div>
+                                <div id="reset-confirm" class="hidden p-5 bg-red-50 border-t border-red-100 transition-all">
+                                    <div class="flex items-start gap-3">
+                                        <i data-lucide="alert-triangle" class="w-5 h-5 text-red-600 shrink-0 mt-0.5"></i>
+                                        <div>
+                                            <p class="text-red-700 font-bold mb-3">정말로 모든 점수 데이터를 초기화하시겠습니까? 이 작업은 복구할 수 없습니다.</p>
+                                            <div class="flex gap-2">
+                                                <button onclick="window.executeReset()" class="px-5 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition shadow-sm">네, 초기화합니다</button>
+                                                <button onclick="window.hideResetConfirm()" class="px-5 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg font-bold hover:bg-slate-50 transition">취소</button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <!-- 로그아웃 설정 -->
-                        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                            <div class="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                <div>
-                                    <h3 class="text-lg font-bold text-slate-800">관리자 로그아웃</h3>
-                                    <p class="text-sm text-slate-500">점수 입력 및 설정 모드를 종료하고 채점 결과 화면으로 돌아갑니다.</p>
+                            <!-- 로그아웃 설정 -->
+                            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                                <div class="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                    <div>
+                                        <h3 class="text-lg font-bold text-slate-800">관리자 로그아웃</h3>
+                                        <p class="text-sm text-slate-500">점수 입력 및 설정 모드를 종료하고 채점 결과 화면으로 돌아갑니다.</p>
+                                    </div>
+                                    <button onclick="window.logoutAdmin()" class="shrink-0 px-4 py-2 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-xl font-bold transition">
+                                        로그아웃
+                                    </button>
                                 </div>
-                                <button onclick="window.logoutAdmin()" class="shrink-0 px-4 py-2 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-xl font-bold transition">
-                                    로그아웃
-                                </button>
                             </div>
                         </div>
-                    </div>
-                `;
-            }
-            container.appendChild(div);
-            lucide.createIcons();
-            
-        } catch (err) {
-            console.error("화면 렌더링 중 오류 발생:", err);
-            const container = document.getElementById('content');
-            if(container) {
-                container.innerHTML = `
-                    <div class="p-8 text-center bg-red-50 rounded-2xl border border-red-100 shadow-sm mt-10">
-                        <i data-lucide="alert-triangle" class="w-12 h-12 text-red-500 mx-auto mb-4"></i>
-                        <h2 class="text-xl font-bold text-red-600 mb-2">화면을 불러오는 중 문제가 발생했습니다.</h2>
-                        <p class="text-red-500 text-sm mb-4">데이터베이스의 설정값(종목, 학급 수 등)이 손상되었거나 불완전합니다.</p>
-                        <button onclick="window.switchView('settings')" class="px-6 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition">설정 메뉴로 이동</button>
-                        <p class="text-xs text-red-400 mt-4 break-words font-mono">${err.message}</p>
-                    </div>
-                `;
+                    `;
+                }
+                container.appendChild(div);
                 lucide.createIcons();
+                
+            } catch (err) {
+                console.error("화면 렌더링 중 오류 발생:", err);
+                const container = document.getElementById('content');
+                if(container) {
+                    container.innerHTML = `
+                        <div class="p-8 text-center bg-red-50 rounded-2xl border border-red-100 shadow-sm mt-10">
+                            <i data-lucide="alert-triangle" class="w-12 h-12 text-red-500 mx-auto mb-4"></i>
+                            <h2 class="text-xl font-bold text-red-600 mb-2">화면을 불러오는 중 문제가 발생했습니다.</h2>
+                            <p class="text-red-500 text-sm mb-4">데이터베이스의 설정값(종목, 학급 수 등)이 손상되었거나 불완전합니다.</p>
+                            <button onclick="window.switchView('settings')" class="px-6 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition">설정 메뉴로 이동</button>
+                            <p class="text-xs text-red-400 mt-4 break-words font-mono">${err.message}</p>
+                        </div>
+                    `;
+                    lucide.createIcons();
+                }
+                document.getElementById('loading').classList.add('hidden');
             }
-            document.getElementById('loading').classList.add('hidden');
         }
-    }
-</script>
+    </script>
 </body>
 </html>
