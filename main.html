@@ -327,30 +327,69 @@ window.onload = async () => {
             document.getElementById('reset-confirm').classList.add('hidden');
         };
 
-        window.executeReset = async () => {
+      window.executeReset = async () => {
             if (!window.isAdminAuthed) return;
             
-            document.getElementById('loading').classList.remove('hidden');
+            // 로딩 화면 표시
+            const loadingEl = document.getElementById('loading');
+            const loadingText = document.getElementById('loading-text');
+            if(loadingEl && loadingText) {
+                loadingText.innerText = "데이터 초기화 중...";
+                loadingEl.classList.remove('hidden');
+            }
             
-            // 모든 점수 초기화 로직
-            for (const docId of Object.keys(window.scores)) {
-                const parts = docId.split('-');
-                if(parts.length === 2) {
-                    const grade = parseInt(parts[0]);
-                    const classNum = parseInt(parts[1]);
-                    window.scores[docId] = { grade, classNum }; // 빈 데이터로 덮어쓰기
-                    
-                    if (db && window.currentUser) {
-                        try {
-                            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'scores', docId), {
-                                grade, classNum, lastUpdated: Date.now()
+            try {
+                const promises = [];
+                
+                // 설정된 모든 학년과 반에 대해 빈 데이터 생성 및 덮어쓰기
+                window.appConfig.GRADES.forEach(g => {
+                    for (let c = 1; c <= g.classes; c++) {
+                        const docId = `${g.grade}-${c}`;
+                        window.scores[docId] = { grade: g.grade, classNum: c }; // 로컬 상태 즉시 초기화
+                        
+                        if (db && window.currentUser) {
+                            // Firestore 업데이트 큐에 추가
+                            const p = setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'scores', docId), {
+                                grade: g.grade, 
+                                classNum: c, 
+                                lastUpdated: Date.now()
                             });
-                        } catch(e) {
-                            console.error("초기화 실패:", e);
+                            promises.push(p);
                         }
                     }
+                });
+                
+                // 모든 업데이트 병렬 실행 (속도 향상)
+                if (promises.length > 0) {
+                    await Promise.all(promises);
+                }
+
+                // 성공 알림 토스트 띄우기 (기존 저장 토스트 재활용)
+                const toast = document.getElementById('save-toast');
+                if(toast) {
+                    toast.innerText = "모든 점수가 성공적으로 초기화되었습니다.";
+                    toast.classList.remove('opacity-0', 'pointer-events-none', 'bg-slate-800');
+                    toast.classList.add('opacity-100', 'bg-red-600');
+                    setTimeout(() => {
+                        toast.classList.add('opacity-0', 'pointer-events-none', 'bg-slate-800');
+                        toast.classList.remove('opacity-100', 'bg-red-600');
+                        toast.innerText = "설정이 성공적으로 저장되었습니다!"; // 문구 원상복구
+                    }, 3000);
+                }
+                
+                window.hideResetConfirm();
+                window.switchView('dashboard'); // 초기화 후 대시보드로 이동
+                
+            } catch(e) {
+                console.error("초기화 실패:", e);
+                alert("초기화 중 오류가 발생했습니다. 권한이나 네트워크를 확인해 주세요.");
+            } finally {
+                if(loadingEl && loadingText) {
+                    loadingEl.classList.add('hidden');
+                    loadingText.innerText = "시스템 로딩 중..."; // 텍스트 원상복구
                 }
             }
+        };
             
             document.getElementById('loading').classList.add('hidden');
             window.switchView('dashboard');
