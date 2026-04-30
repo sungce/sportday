@@ -144,8 +144,7 @@
             ]
         };
 
-        // --- Initialize ---
-        // --- Initialize ---
+  // --- Initialize ---
 window.onload = async () => {
     lucide.createIcons();
 
@@ -189,43 +188,6 @@ window.onload = async () => {
         document.getElementById('loading')?.classList.add('hidden');  // ← 로딩 숨기기
     }
 };
-
-        window.forceStart = () => {
-            document.getElementById('loading').classList.add('hidden');
-            render();
-        };
-
-        window.updateTitles = () => {
-            const year = window.appConfig.year || "2026";
-            const schoolName = window.appConfig.schoolName || "수완하나중";
-            const fullTitle = `${year} ${schoolName} Sports Day 채점 현황`;
-            
-            const pageTitle = document.getElementById('page-title');
-            if (pageTitle) pageTitle.innerText = fullTitle;
-            
-            const navTitle = document.getElementById('nav-title');
-            if (navTitle) navTitle.innerText = fullTitle;
-            
-            const footerText = document.getElementById('footer-text');
-            if (footerText) footerText.innerText = `© ${year} ${schoolName}`;
-        };
-
-        function listenToConfig() {
-            if (!window.currentUser) return;
-            const q = doc(db, 'artifacts', appId, 'public', 'data', 'config', 'main');
-            onSnapshot(q, (docSnap) => {
-                if (docSnap.exists()) {
-                    window.appConfig = docSnap.data();
-                } else {
-                    setDoc(q, window.appConfig); // DB에 초기값 생성
-                }
-                window.updateTitles();
-                render();
-            }, (err) => {
-                console.error("Config Listen Error:", err);
-            });
-        }
-
         function listenToScores() {
             if (!window.currentUser) return;
             const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'scores'));
