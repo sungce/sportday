@@ -130,6 +130,16 @@
         const ADMIN_PWD = "suwan123";
 
         // 초기 기본 설정값 (DB에서 불러오기 전)
+        const DEFAULT_EVENTS = [
+            { id: 'tug', name: '줄다리기', type: 'rank', points: { 1: 600, 2: 500, 3: 400, base: 300 } },
+            { id: 'sixLeg', name: '5인 6각', type: 'rank', points: { 1: 600, 2: 500, 3: 400, base: 300 } },
+            { id: 'jump8', name: '8자 마라톤 줄넘기', type: 'rank', points: { 1: 500, 2: 400, 3: 300, base: 200 } },
+            { id: 'longRope', name: '긴줄 함께뛰기', type: 'rank', points: { 1: 400, 2: 300, 3: 200, base: 100 } },
+            { id: 'relay', name: '이어달리기', type: 'rank', points: { 1: 400, 2: 300, 3: 200, base: 100 } },
+            { id: 'cheer', name: '기타(응원상)', type: 'raw' },
+            { id: 'penalty', name: '감점', type: 'penalty' }
+        ];
+
         window.appConfig = {
             year: "2026",
             schoolName: "수완하나중",
@@ -138,14 +148,19 @@
                 { grade: 2, classes: 10 },
                 { grade: 3, classes: 11 }
             ],
-            EVENTS: [
-                { id: 'tug', name: '줄다리기', type: 'rank', points: { 1: 600, 2: 500, 3: 400, base: 300 } },
-                { id: 'sixLeg', name: '5인 6각', type: 'rank', points: { 1: 600, 2: 500, 3: 400, base: 300 } },
-                { id: 'jump8', name: '8자 마라톤 줄넘기', type: 'rank', points: { 1: 500, 2: 400, 3: 300, base: 200 } },
-                { id: 'longRope', name: '긴줄 함께뛰기', type: 'rank', points: { 1: 400, 2: 300, 3: 200, base: 100 } },
-                { id: 'relay', name: '이어달리기', type: 'rank', points: { 1: 400, 2: 300, 3: 200, base: 100 } },
-                { id: 'cheer', name: '기타(응원상)', type: 'raw' }
-            ]
+            eventMode: 'common', // 'common' (통합) or 'separate' (개별)
+            EVENTS: JSON.parse(JSON.stringify(DEFAULT_EVENTS)),
+            EVENTS_1: JSON.parse(JSON.stringify(DEFAULT_EVENTS)),
+            EVENTS_2: JSON.parse(JSON.stringify(DEFAULT_EVENTS)),
+            EVENTS_3: JSON.parse(JSON.stringify(DEFAULT_EVENTS))
+        };
+
+        // 학년별 종목 추출 헬퍼 함수
+        window.getEventsForGrade = (grade) => {
+            if (window.appConfig && window.appConfig.eventMode === 'separate') {
+                return window.appConfig[`EVENTS_${grade}`] || [];
+            }
+            return window.appConfig?.EVENTS || [];
         };
 
         // --- Initialize ---
@@ -209,12 +224,15 @@
             onSnapshot(q, (docSnap) => {
                 if (docSnap.exists()) {
                     const data = docSnap.data();
-                    // DB 설정값이 비어있거나 배열이 삭제된 경우 화면 렌더링이 멈추는 오류 방지 (안전 장치 추가)
                     window.appConfig = {
                         year: data.year || window.appConfig.year || "2026",
                         schoolName: data.schoolName || window.appConfig.schoolName || "수완하나중",
                         GRADES: (data.GRADES && data.GRADES.length > 0) ? data.GRADES : window.appConfig.GRADES,
-                        EVENTS: (data.EVENTS && data.EVENTS.length > 0) ? data.EVENTS : window.appConfig.EVENTS
+                        eventMode: data.eventMode || 'common',
+                        EVENTS: data.EVENTS || window.appConfig.EVENTS,
+                        EVENTS_1: data.EVENTS_1 || data.EVENTS || window.appConfig.EVENTS,
+                        EVENTS_2: data.EVENTS_2 || data.EVENTS || window.appConfig.EVENTS,
+                        EVENTS_3: data.EVENTS_3 || data.EVENTS || window.appConfig.EVENTS
                     };
                 } else {
                     setDoc(q, window.appConfig); // DB에 초기값 생성
@@ -247,9 +265,10 @@
         function calculateStats() {
             const results = [];
             const grades = window.appConfig?.GRADES || [];
-            const events = window.appConfig?.EVENTS || [];
 
             grades.forEach(g => {
+                const events = window.getEventsForGrade(g.grade);
+
                 for (let c = 1; c <= g.classes; c++) {
                     const id = `${g.grade}-${c}`;
                     const classData = window.scores[id] || {};
@@ -261,6 +280,9 @@
                         let p = 0;
                         if (ev.type === 'raw') {
                             p = parseInt(val) || 0;
+                        } else if (ev.type === 'penalty') {
+                            // penalty인 경우 무조건 절대값의 음수로 계산
+                            p = -(Math.abs(parseInt(val) || 0));
                         } else {
                             const pts = ev.points || {}; // points 객체가 없을 경우 에러 방지
                             if (val == 1) p = pts[1] || 0;
@@ -269,7 +291,7 @@
                             else if (val >= 4) p = pts.base || 0;
                         }
                         total += p;
-                        breakdown[ev.id] = p;
+                        breakdown[ev.id] = p; // penalty라면 자동으로 음수가 저장됨
                     });
                     results.push({ id, grade: g.grade, classNum: c, total, breakdown });
                 }
@@ -334,7 +356,6 @@
         window.executeReset = async () => {
             if (!window.isAdminAuthed) return;
             
-            // 로딩 화면 표시
             const loadingEl = document.getElementById('loading');
             const loadingText = document.getElementById('loading-text');
             if(loadingEl && loadingText) {
@@ -344,15 +365,12 @@
             
             try {
                 const promises = [];
-                
-                // 설정된 모든 학년과 반에 대해 빈 데이터 생성 및 덮어쓰기
                 window.appConfig.GRADES.forEach(g => {
                     for (let c = 1; c <= g.classes; c++) {
                         const docId = `${g.grade}-${c}`;
-                        window.scores[docId] = { grade: g.grade, classNum: c }; // 로컬 상태 즉시 초기화
+                        window.scores[docId] = { grade: g.grade, classNum: c };
                         
                         if (db && window.currentUser) {
-                            // Firestore 업데이트 큐에 추가
                             const p = setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'scores', docId), {
                                 grade: g.grade, 
                                 classNum: c, 
@@ -363,12 +381,10 @@
                     }
                 });
                 
-                // 모든 업데이트 병렬 실행 (속도 향상)
                 if (promises.length > 0) {
                     await Promise.all(promises);
                 }
 
-                // 성공 알림 토스트 띄우기 (기존 저장 토스트 재활용)
                 const toast = document.getElementById('save-toast');
                 if(toast) {
                     toast.innerText = "모든 점수가 성공적으로 초기화되었습니다.";
@@ -377,12 +393,12 @@
                     setTimeout(() => {
                         toast.classList.add('opacity-0', 'pointer-events-none', 'bg-slate-800');
                         toast.classList.remove('opacity-100', 'bg-red-600');
-                        toast.innerText = "설정이 성공적으로 저장되었습니다!"; // 문구 원상복구
+                        toast.innerText = "설정이 성공적으로 저장되었습니다!";
                     }, 3000);
                 }
                 
                 window.hideResetConfirm();
-                window.switchView('dashboard'); // 초기화 후 대시보드로 이동
+                window.switchView('dashboard');
                 
             } catch(e) {
                 console.error("초기화 실패:", e);
@@ -390,7 +406,7 @@
             } finally {
                 if(loadingEl && loadingText) {
                     loadingEl.classList.add('hidden');
-                    loadingText.innerText = "시스템 로딩 중..."; // 텍스트 원상복구
+                    loadingText.innerText = "시스템 로딩 중...";
                 }
             }
         };
@@ -425,19 +441,21 @@
             }
         };
 
-        // 설정 전용 헬퍼 함수들
+        // --- 설정 뷰 헬퍼 함수들 ---
         window.togglePoints = (selectEl) => {
             const tr = selectEl.closest('tr');
             const inputs = tr.querySelectorAll('.points-input');
-            if (selectEl.value === 'raw') {
+            if (selectEl.value === 'raw' || selectEl.value === 'penalty') {
                 inputs.forEach(input => { input.disabled = true; input.classList.add('bg-slate-100', 'text-transparent'); });
             } else {
                 inputs.forEach(input => { input.disabled = false; input.classList.remove('bg-slate-100', 'text-transparent'); });
             }
         };
 
-        window.addEventRow = () => {
-            const tbody = document.getElementById('config-events-tbody');
+        window.addEventRow = (gradeNum) => {
+            const tbody = document.getElementById(`config-events-tbody-${gradeNum}`);
+            if(!tbody) return;
+
             const tr = document.createElement('tr');
             tr.className = "cfg-event-row border-b border-slate-100 hover:bg-slate-50 transition-colors";
             const newId = 'ev_' + Date.now();
@@ -447,7 +465,8 @@
                 <td class="p-2">
                     <select class="cfg-ev-type w-full p-2 border border-slate-200 rounded text-sm outline-none focus:border-blue-500" onchange="window.togglePoints(this)">
                         <option value="rank">순위제</option>
-                        <option value="raw">점수입력</option>
+                        <option value="raw">점수입력(가점)</option>
+                        <option value="penalty">감점입력(마이너스)</option>
                     </select>
                 </td>
                 <td class="p-2"><input type="number" class="cfg-ev-p1 w-full p-2 border border-slate-200 rounded text-sm points-input outline-none focus:border-blue-500" placeholder="1위"></td>
@@ -462,34 +481,47 @@
             lucide.createIcons();
         };
 
-        window.saveConfig = async () => {
-            if(!window.isAdminAuthed) return;
-            
-            const btn = document.getElementById('save-config-btn');
-            const originalText = btn.innerHTML;
-            btn.innerHTML = '<div class="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto"></div>';
-            
-            const newConfig = {
-                year: document.getElementById('cfg-year').value || new Date().getFullYear().toString(),
-                schoolName: document.getElementById('cfg-school').value || '학교',
-                GRADES: [
-                    { grade: 1, classes: parseInt(document.getElementById('cfg-g1').value) || 0 },
-                    { grade: 2, classes: parseInt(document.getElementById('cfg-g2').value) || 0 },
-                    { grade: 3, classes: parseInt(document.getElementById('cfg-g3').value) || 0 }
-                ],
-                EVENTS: []
-            };
-            
-            const eventRows = document.querySelectorAll('.cfg-event-row');
-            eventRows.forEach((row, index) => {
+        window.toggleEventMode = (mode) => {
+            if (mode === 'common') {
+                document.getElementById('cfg-events-common').classList.remove('hidden');
+                document.getElementById('cfg-events-separate').classList.add('hidden');
+            } else {
+                document.getElementById('cfg-events-common').classList.add('hidden');
+                document.getElementById('cfg-events-separate').classList.remove('hidden');
+                window.switchEventTab(1); // 다를 경우 선택 시 기본 1학년 탭 켜기
+            }
+        };
+
+        window.switchEventTab = (gradeNum) => {
+            [1, 2, 3].forEach(n => {
+                const btn = document.getElementById(`evt-tab-btn-${n}`);
+                const panel = document.getElementById(`cfg-events-g${n}`);
+                if (!btn || !panel) return;
+
+                if (n === gradeNum) {
+                    btn.classList.add('border-blue-600', 'text-blue-600');
+                    btn.classList.remove('border-transparent', 'text-slate-500', 'hover:text-slate-700');
+                    panel.classList.remove('hidden');
+                } else {
+                    btn.classList.remove('border-blue-600', 'text-blue-600');
+                    btn.classList.add('border-transparent', 'text-slate-500', 'hover:text-slate-700');
+                    panel.classList.add('hidden');
+                }
+            });
+        };
+
+        const extractEventsFromTable = (tbodyId) => {
+            const rows = document.querySelectorAll(`#${tbodyId} .cfg-event-row`);
+            const extracted = [];
+            rows.forEach((row, index) => {
                 const id = row.dataset.id || ('ev_' + Date.now() + '_' + index);
                 const name = row.querySelector('.cfg-ev-name').value;
                 const type = row.querySelector('.cfg-ev-type').value;
                 
-                if(!name.trim()) return; // 이름이 비어있으면 저장 무시
+                if(!name.trim()) return; // 비어있는 이름 무시
                 
                 if(type === 'rank') {
-                    newConfig.EVENTS.push({
+                    extracted.push({
                         id, name, type,
                         points: {
                             1: parseInt(row.querySelector('.cfg-ev-p1').value) || 0,
@@ -499,10 +531,37 @@
                         }
                     });
                 } else {
-                    newConfig.EVENTS.push({ id, name, type });
+                    extracted.push({ id, name, type });
                 }
             });
+            return extracted;
+        };
 
+        window.saveConfig = async () => {
+            if(!window.isAdminAuthed) return;
+            
+            const btn = document.getElementById('save-config-btn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<div class="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto"></div>';
+            
+            const eventModeRadio = document.querySelector('input[name="eventMode"]:checked');
+            const newMode = eventModeRadio ? eventModeRadio.value : (window.appConfig.eventMode || 'common');
+
+            const newConfig = {
+                year: document.getElementById('cfg-year').value || new Date().getFullYear().toString(),
+                schoolName: document.getElementById('cfg-school').value || '학교',
+                GRADES: [
+                    { grade: 1, classes: parseInt(document.getElementById('cfg-g1').value) || 0 },
+                    { grade: 2, classes: parseInt(document.getElementById('cfg-g2').value) || 0 },
+                    { grade: 3, classes: parseInt(document.getElementById('cfg-g3').value) || 0 }
+                ],
+                eventMode: newMode,
+                EVENTS: extractEventsFromTable('config-events-tbody-0'),
+                EVENTS_1: extractEventsFromTable('config-events-tbody-1'),
+                EVENTS_2: extractEventsFromTable('config-events-tbody-2'),
+                EVENTS_3: extractEventsFromTable('config-events-tbody-3')
+            };
+            
             window.appConfig = newConfig;
             window.updateTitles();
             
@@ -525,6 +584,50 @@
             render(); // 화면 갱신
         };
 
+        function buildEventTableHtml(gradeNum, evs) {
+            if (!evs) evs = [];
+            let rowsHtml = evs.map(ev => `
+                <tr class="cfg-event-row border-b border-slate-100 hover:bg-slate-50 transition-colors" data-id="${ev.id}">
+                    <td class="p-2"><input type="text" class="cfg-ev-name w-full p-2 border border-slate-200 rounded text-sm outline-none focus:border-blue-500" value="${ev.name}"></td>
+                    <td class="p-2">
+                        <select class="cfg-ev-type w-full p-2 border border-slate-200 rounded text-sm outline-none focus:border-blue-500" onchange="window.togglePoints(this)">
+                            <option value="rank" ${ev.type === 'rank' ? 'selected' : ''}>순위제</option>
+                            <option value="raw" ${ev.type === 'raw' ? 'selected' : ''}>점수입력(가점)</option>
+                            <option value="penalty" ${ev.type === 'penalty' ? 'selected' : ''}>감점입력(마이너스)</option>
+                        </select>
+                    </td>
+                    <td class="p-2"><input type="number" class="cfg-ev-p1 w-full p-2 border border-slate-200 rounded text-sm points-input outline-none focus:border-blue-500 ${(ev.type === 'raw' || ev.type === 'penalty') ? 'bg-slate-100 text-transparent' : ''}" value="${ev.points?.[1] ?? ''}" ${(ev.type === 'raw' || ev.type === 'penalty') ? 'disabled' : ''}></td>
+                    <td class="p-2"><input type="number" class="cfg-ev-p2 w-full p-2 border border-slate-200 rounded text-sm points-input outline-none focus:border-blue-500 ${(ev.type === 'raw' || ev.type === 'penalty') ? 'bg-slate-100 text-transparent' : ''}" value="${ev.points?.[2] ?? ''}" ${(ev.type === 'raw' || ev.type === 'penalty') ? 'disabled' : ''}></td>
+                    <td class="p-2"><input type="number" class="cfg-ev-p3 w-full p-2 border border-slate-200 rounded text-sm points-input outline-none focus:border-blue-500 ${(ev.type === 'raw' || ev.type === 'penalty') ? 'bg-slate-100 text-transparent' : ''}" value="${ev.points?.[3] ?? ''}" ${(ev.type === 'raw' || ev.type === 'penalty') ? 'disabled' : ''}></td>
+                    <td class="p-2"><input type="number" class="cfg-ev-pb w-full p-2 border border-slate-200 rounded text-sm points-input outline-none focus:border-blue-500 ${(ev.type === 'raw' || ev.type === 'penalty') ? 'bg-slate-100 text-transparent' : ''}" value="${ev.points?.base ?? ''}" ${(ev.type === 'raw' || ev.type === 'penalty') ? 'disabled' : ''}></td>
+                    <td class="p-2 text-center">
+                        <button onclick="this.closest('tr').remove()" class="p-2 text-red-500 hover:bg-red-50 rounded-lg transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+
+            return `
+                <div class="p-2 overflow-x-auto">
+                    <table class="w-full text-left min-w-[700px]">
+                        <thead>
+                            <tr class="text-[11px] text-slate-400 uppercase bg-slate-50/50">
+                                <th class="p-3 w-1/4">종목명</th>
+                                <th class="p-3 w-32">채점 방식</th>
+                                <th class="p-3 w-20">1위</th>
+                                <th class="p-3 w-20">2위</th>
+                                <th class="p-3 w-20">3위</th>
+                                <th class="p-3 w-20">기본/참가</th>
+                                <th class="p-3 w-12 text-center">삭제</th>
+                            </tr>
+                        </thead>
+                        <tbody id="config-events-tbody-${gradeNum}" class="divide-y divide-slate-100">
+                            ${rowsHtml}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
         function render() {
             try {
                 const stats = calculateStats();
@@ -535,7 +638,6 @@
                 div.className = "fade-in";
 
                 const currentConfigGrades = window.appConfig?.GRADES || [];
-                const currentConfigEvents = window.appConfig?.EVENTS || [];
 
                 if (window.currentView === 'dashboard') {
                     currentConfigGrades.forEach(g => {
@@ -622,6 +724,8 @@
                     });
                 } else if (window.currentView === 'table') {
                     currentConfigGrades.forEach(g => {
+                        const currentGradeEvents = window.getEventsForGrade(g.grade);
+
                         let html = `
                             <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 mb-10">
                                 <div class="p-5 bg-slate-800 text-white flex justify-between items-center">
@@ -632,7 +736,7 @@
                                         <thead>
                                             <tr class="bg-slate-100 text-slate-600 font-bold border-b border-slate-200">
                                                 <th class="p-3">반</th>
-                                                ${currentConfigEvents.map(ev => `<th class="p-3 text-xs min-w-[90px] ${ev.id === 'cheer' ? 'bg-amber-50 text-amber-700' : ''}">${ev.name}</th>`).join('')}
+                                                ${currentGradeEvents.map(ev => `<th class="p-3 text-xs min-w-[90px] ${ev.id === 'cheer' ? 'bg-amber-50 text-amber-700' : (ev.type === 'penalty' ? 'bg-red-50 text-red-700' : '')}">${ev.name}</th>`).join('')}
                                                 <th class="p-3 bg-blue-50 text-blue-700 font-black">합계</th>
                                                 <th class="p-3">순위</th>
                                             </tr>
@@ -663,7 +767,11 @@
                             html += `
                                 <tr class="transition-colors ${rowClass}">
                                     <td class="p-3 font-bold text-slate-600 border-r border-slate-200/50">${s.classNum}반</td>
-                                    ${currentConfigEvents.map(ev => `<td class="p-3 text-xs ${ev.type === 'raw' ? 'font-bold text-slate-600' : 'text-slate-500'}">${s.breakdown[ev.id] || 0}</td>`).join('')}
+                                    ${currentGradeEvents.map(ev => {
+                                        const pts = s.breakdown[ev.id] || 0;
+                                        const textClass = ev.type === 'penalty' ? 'font-bold text-red-500' : (ev.type === 'raw' ? 'font-bold text-slate-600' : 'text-slate-500');
+                                        return `<td class="p-3 text-xs ${textClass}">${pts}</td>`;
+                                    }).join('')}
                                     <td class="p-3 font-black text-blue-600 bg-blue-50/30">${(s.total || 0).toLocaleString()}</td>
                                     <td class="p-3"><span class="px-2 py-0.5 rounded text-[11px] font-bold ${rankBadgeClass}">${rank}위</span></td>
                                 </tr>
@@ -692,6 +800,8 @@
 
                     currentConfigGrades.forEach(g => {
                         const gradeData = stats.filter(s => s.grade === g.grade);
+                        const currentGradeEvents = window.getEventsForGrade(g.grade);
+
                         // 인쇄 시에는 반 순서대로 정렬하여 보기 좋게 표시
                         gradeData.sort((a, b) => a.classNum - b.classNum);
 
@@ -702,7 +812,7 @@
                                     <thead>
                                         <tr class="bg-slate-100 text-slate-700 font-bold print-bg">
                                             <th class="p-2 border border-slate-300">반</th>
-                                            ${currentConfigEvents.map(ev => `<th class="p-2 border border-slate-300">${ev.name}</th>`).join('')}
+                                            ${currentGradeEvents.map(ev => `<th class="p-2 border border-slate-300">${ev.name}</th>`).join('')}
                                             <th class="p-2 border border-slate-300 bg-slate-200 print-bg">총점</th>
                                             <th class="p-2 border border-slate-300 bg-slate-200 print-bg">순위</th>
                                         </tr>
@@ -713,7 +823,11 @@
                             html += `
                                 <tr>
                                     <td class="p-2 border border-slate-300 font-bold text-slate-700">${s.classNum}반</td>
-                                    ${currentConfigEvents.map(ev => `<td class="p-2 border border-slate-300">${s.breakdown[ev.id] || 0}</td>`).join('')}
+                                    ${currentGradeEvents.map(ev => {
+                                        const pts = s.breakdown[ev.id] || 0;
+                                        const textClass = ev.type === 'penalty' ? 'font-bold text-red-600' : '';
+                                        return `<td class="p-2 border border-slate-300 ${textClass}">${pts}</td>`;
+                                    }).join('')}
                                     <td class="p-2 border border-slate-300 font-black text-slate-800 bg-slate-50 print-bg">${(s.total || 0).toLocaleString()}</td>
                                     <td class="p-2 border border-slate-300 font-bold text-slate-800 bg-slate-50 print-bg">${getRank(g.grade, s.total, stats)}위</td>
                                 </tr>
@@ -735,6 +849,8 @@
                         </div>
                     `;
                     currentConfigGrades.forEach(g => {
+                        const currentGradeEvents = window.getEventsForGrade(g.grade);
+
                         let html = `
                             <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-6">
                                 <div class="p-3 bg-slate-50 border-b font-bold text-sm">${g.grade}학년 점수 입력</div>
@@ -742,19 +858,26 @@
                                     <table class="w-full">
                                         <thead><tr class="text-[10px] text-slate-400 uppercase text-center">
                                             <th class="p-2 text-left">반</th>
-                                            ${currentConfigEvents.map(ev => `<th class="p-2 min-w-[80px]">${ev.name}</th>`).join('')}
+                                            ${currentGradeEvents.map(ev => `<th class="p-2 min-w-[80px]">${ev.name}</th>`).join('')}
                                         </tr></thead>
                                         <tbody class="divide-y">
                         `;
                         for (let c = 1; c <= g.classes; c++) {
                             const classScores = window.scores[`${g.grade}-${c}`] || {};
                             html += `<tr><td class="p-2 font-bold text-slate-500 text-sm">${c}반</td>`;
-                            currentConfigEvents.forEach(ev => {
+                            currentGradeEvents.forEach(ev => {
                                 if (ev.type === 'raw') {
                                     html += `<td class="p-1">
                                         <input type="number" onchange="window.updateScore(${g.grade}, ${c}, '${ev.id}', this.value)" 
                                             value="${classScores[ev.id] ?? ''}" placeholder="점수"
                                             class="w-full p-2 rounded-lg bg-amber-50 border border-amber-100 text-xs font-bold text-center outline-none focus:ring-2 focus:ring-amber-500">
+                                    </td>`;
+                                } else if (ev.type === 'penalty') {
+                                    const displayVal = classScores[ev.id] !== undefined && classScores[ev.id] !== null ? Math.abs(classScores[ev.id]) : '';
+                                    html += `<td class="p-1">
+                                        <input type="number" onchange="window.updateScore(${g.grade}, ${c}, '${ev.id}', this.value)" 
+                                            value="${displayVal}" placeholder="감점" min="0"
+                                            class="w-full p-2 rounded-lg bg-red-50 border border-red-100 text-red-600 text-xs font-bold text-center outline-none focus:ring-2 focus:ring-red-500 placeholder-red-300">
                                     </td>`;
                                 } else {
                                     html += `<td class="p-1">
@@ -780,25 +903,7 @@
                         return;
                     }
 
-                    // 종목 행 동적 렌더링
-                    let eventsRowsHtml = currentConfigEvents.map(ev => `
-                        <tr class="cfg-event-row border-b border-slate-100 hover:bg-slate-50 transition-colors" data-id="${ev.id}">
-                            <td class="p-2"><input type="text" class="cfg-ev-name w-full p-2 border border-slate-200 rounded text-sm outline-none focus:border-blue-500" value="${ev.name}"></td>
-                            <td class="p-2">
-                                <select class="cfg-ev-type w-full p-2 border border-slate-200 rounded text-sm outline-none focus:border-blue-500" onchange="window.togglePoints(this)">
-                                    <option value="rank" ${ev.type === 'rank' ? 'selected' : ''}>순위제</option>
-                                    <option value="raw" ${ev.type === 'raw' ? 'selected' : ''}>점수입력</option>
-                                </select>
-                            </td>
-                            <td class="p-2"><input type="number" class="cfg-ev-p1 w-full p-2 border border-slate-200 rounded text-sm points-input outline-none focus:border-blue-500 ${ev.type === 'raw' ? 'bg-slate-100 text-transparent' : ''}" value="${ev.points?.[1] || ''}" ${ev.type === 'raw' ? 'disabled' : ''}></td>
-                            <td class="p-2"><input type="number" class="cfg-ev-p2 w-full p-2 border border-slate-200 rounded text-sm points-input outline-none focus:border-blue-500 ${ev.type === 'raw' ? 'bg-slate-100 text-transparent' : ''}" value="${ev.points?.[2] || ''}" ${ev.type === 'raw' ? 'disabled' : ''}></td>
-                            <td class="p-2"><input type="number" class="cfg-ev-p3 w-full p-2 border border-slate-200 rounded text-sm points-input outline-none focus:border-blue-500 ${ev.type === 'raw' ? 'bg-slate-100 text-transparent' : ''}" value="${ev.points?.[3] || ''}" ${ev.type === 'raw' ? 'disabled' : ''}></td>
-                            <td class="p-2"><input type="number" class="cfg-ev-pb w-full p-2 border border-slate-200 rounded text-sm points-input outline-none focus:border-blue-500 ${ev.type === 'raw' ? 'bg-slate-100 text-transparent' : ''}" value="${ev.points?.base || ''}" ${ev.type === 'raw' ? 'disabled' : ''}></td>
-                            <td class="p-2 text-center">
-                                <button onclick="this.closest('tr').remove()" class="p-2 text-red-500 hover:bg-red-50 rounded-lg transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                            </td>
-                        </tr>
-                    `).join('');
+                    const mode = window.appConfig.eventMode || 'common';
 
                     div.innerHTML = `
                         <div class="bg-blue-600 text-white p-5 rounded-3xl shadow-lg flex items-center justify-between mb-6">
@@ -842,15 +947,15 @@
                                 <div class="p-5 grid grid-cols-1 sm:grid-cols-3 gap-6">
                                     <div>
                                         <label class="block text-xs font-bold text-slate-500 mb-2">1학년 반 수</label>
-                                        <input type="number" id="cfg-g1" value="${window.appConfig.GRADES.find(g=>g.grade===1)?.classes || 0}" class="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-bold text-slate-700">
+                                        <input type="number" id="cfg-g1" value="${currentConfigGrades.find(g=>g.grade===1)?.classes || 0}" class="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-bold text-slate-700">
                                     </div>
                                     <div>
                                         <label class="block text-xs font-bold text-slate-500 mb-2">2학년 반 수</label>
-                                        <input type="number" id="cfg-g2" value="${window.appConfig.GRADES.find(g=>g.grade===2)?.classes || 0}" class="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-bold text-slate-700">
+                                        <input type="number" id="cfg-g2" value="${currentConfigGrades.find(g=>g.grade===2)?.classes || 0}" class="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-bold text-slate-700">
                                     </div>
                                     <div>
                                         <label class="block text-xs font-bold text-slate-500 mb-2">3학년 반 수</label>
-                                        <input type="number" id="cfg-g3" value="${window.appConfig.GRADES.find(g=>g.grade===3)?.classes || 0}" class="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-bold text-slate-700">
+                                        <input type="number" id="cfg-g3" value="${currentConfigGrades.find(g=>g.grade===3)?.classes || 0}" class="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-bold text-slate-700">
                                     </div>
                                 </div>
                             </div>
@@ -861,30 +966,68 @@
                                     <div class="font-bold text-slate-800 flex items-center gap-2">
                                         <i data-lucide="medal" class="w-4 h-4 text-blue-500"></i> 종목 및 배점 설정
                                     </div>
-                                    <button onclick="window.addEventRow()" class="px-3 py-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg text-xs font-bold transition flex items-center gap-1">
-                                        <i data-lucide="plus" class="w-3.5 h-3.5"></i> 종목 추가
-                                    </button>
                                 </div>
-                                <div class="p-2 overflow-x-auto">
-                                    <table class="w-full text-left min-w-[700px]">
-                                        <thead>
-                                            <tr class="text-[11px] text-slate-400 uppercase bg-slate-50/50">
-                                                <th class="p-3 w-1/4">종목명</th>
-                                                <th class="p-3 w-32">채점 방식</th>
-                                                <th class="p-3 w-20">1위</th>
-                                                <th class="p-3 w-20">2위</th>
-                                                <th class="p-3 w-20">3위</th>
-                                                <th class="p-3 w-20">기본/참가</th>
-                                                <th class="p-3 w-12 text-center">삭제</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="config-events-tbody" class="divide-y divide-slate-100">
-                                            ${eventsRowsHtml}
-                                        </tbody>
-                                    </table>
+
+                                <!-- 모드 전환 스위치 -->
+                                <div class="flex flex-col sm:flex-row gap-6 p-4 border-b border-slate-100 bg-white">
+                                    <label class="flex items-center gap-3 cursor-pointer group">
+                                        <input type="radio" name="eventMode" value="common" onchange="window.toggleEventMode('common')" ${mode === 'common' ? 'checked' : ''} class="w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500">
+                                        <span class="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition">학년 통합 종목 (모든 학년 동일)</span>
+                                    </label>
+                                    <label class="flex items-center gap-3 cursor-pointer group">
+                                        <input type="radio" name="eventMode" value="separate" onchange="window.toggleEventMode('separate')" ${mode === 'separate' ? 'checked' : ''} class="w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500">
+                                        <span class="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition">학년별 개별 종목 (다를 경우)</span>
+                                    </label>
                                 </div>
+
+                                <!-- 통합 모드 (모든 학년 동일) 컨테이너 -->
+                                <div id="cfg-events-common" class="${mode === 'separate' ? 'hidden' : ''}">
+                                    <div class="p-3 bg-blue-50/50 flex justify-end">
+                                        <button onclick="window.addEventRow(0)" class="px-3 py-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg text-xs font-bold transition flex items-center gap-1">
+                                            <i data-lucide="plus" class="w-3.5 h-3.5"></i> 통합 종목 추가
+                                        </button>
+                                    </div>
+                                    ${buildEventTableHtml(0, window.appConfig.EVENTS || [])}
+                                </div>
+
+                                <!-- 개별 모드 (학년별 다를 경우) 컨테이너 -->
+                                <div id="cfg-events-separate" class="${mode === 'separate' ? '' : 'hidden'} bg-slate-50">
+                                    <div class="flex border-b border-slate-200">
+                                        <button id="evt-tab-btn-1" onclick="window.switchEventTab(1)" class="flex-1 py-3 text-sm font-bold border-b-2 border-blue-600 text-blue-600 transition">1학년 종목</button>
+                                        <button id="evt-tab-btn-2" onclick="window.switchEventTab(2)" class="flex-1 py-3 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 transition">2학년 종목</button>
+                                        <button id="evt-tab-btn-3" onclick="window.switchEventTab(3)" class="flex-1 py-3 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 transition">3학년 종목</button>
+                                    </div>
+                                    
+                                    <div id="cfg-events-g1" class="bg-white">
+                                        <div class="p-3 flex justify-end bg-blue-50/30 border-b border-blue-50">
+                                            <button onclick="window.addEventRow(1)" class="px-3 py-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg text-xs font-bold transition flex items-center gap-1">
+                                                <i data-lucide="plus" class="w-3.5 h-3.5"></i> 1학년 종목 추가
+                                            </button>
+                                        </div>
+                                        ${buildEventTableHtml(1, window.appConfig.EVENTS_1 || [])}
+                                    </div>
+                                    
+                                    <div id="cfg-events-g2" class="hidden bg-white">
+                                        <div class="p-3 flex justify-end bg-blue-50/30 border-b border-blue-50">
+                                            <button onclick="window.addEventRow(2)" class="px-3 py-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg text-xs font-bold transition flex items-center gap-1">
+                                                <i data-lucide="plus" class="w-3.5 h-3.5"></i> 2학년 종목 추가
+                                            </button>
+                                        </div>
+                                        ${buildEventTableHtml(2, window.appConfig.EVENTS_2 || [])}
+                                    </div>
+                                    
+                                    <div id="cfg-events-g3" class="hidden bg-white">
+                                        <div class="p-3 flex justify-end bg-blue-50/30 border-b border-blue-50">
+                                            <button onclick="window.addEventRow(3)" class="px-3 py-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg text-xs font-bold transition flex items-center gap-1">
+                                                <i data-lucide="plus" class="w-3.5 h-3.5"></i> 3학년 종목 추가
+                                            </button>
+                                        </div>
+                                        ${buildEventTableHtml(3, window.appConfig.EVENTS_3 || [])}
+                                    </div>
+                                </div>
+
                                 <div class="p-4 bg-amber-50 border-t border-amber-100 text-xs text-amber-700 font-medium">
-                                    <span class="font-bold">💡 채점 방식 안내:</span> '순위제'는 등수별 점수를 일괄 부여하며, '점수입력'은 현장에서 직접 득점 점수(응원상 등)를 타이핑할 때 사용합니다.
+                                    <span class="font-bold">💡 채점 방식 안내:</span> '순위제'는 등수별 점수를 일괄 부여하며, '점수입력(가점)' 및 '감점입력(마이너스)'은 현장에서 직접 득점/감점 점수를 타이핑할 때 사용합니다. 감점은 입력 시 자동으로 총점에서 차감됩니다.
                                 </div>
                             </div>
 
