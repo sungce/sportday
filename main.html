@@ -641,12 +641,31 @@
                         `;
                         const gradeData = stats.filter(s => s.grade === g.grade);
                         gradeData.forEach(s => {
+                            const rank = getRank(g.grade, s.total, stats);
+                            
+                            // 순위에 따른 하이라이트 스타일 설정
+                            let rowClass = "hover:bg-slate-50";
+                            let rankBadgeClass = "bg-slate-100 text-slate-600";
+                            
+                            if (rank === 1) {
+                                rowClass = "bg-yellow-50/60 hover:bg-yellow-100/60 border-l-4 border-yellow-400";
+                                rankBadgeClass = "bg-yellow-400 text-white shadow-sm";
+                            } else if (rank === 2) {
+                                rowClass = "bg-slate-100 hover:bg-slate-200/70 border-l-4 border-slate-400";
+                                rankBadgeClass = "bg-slate-400 text-white shadow-sm";
+                            } else if (rank === 3) {
+                                rowClass = "bg-orange-50/60 hover:bg-orange-100/60 border-l-4 border-orange-400";
+                                rankBadgeClass = "bg-orange-400 text-white shadow-sm";
+                            } else {
+                                rowClass = "hover:bg-slate-50 border-l-4 border-transparent";
+                            }
+
                             html += `
-                                <tr class="hover:bg-slate-50">
-                                    <td class="p-3 font-bold text-slate-500 border-r border-slate-100">${s.classNum}반</td>
-                                    ${currentConfigEvents.map(ev => `<td class="p-3 text-xs ${ev.type === 'raw' ? 'bg-amber-50/30 font-bold' : 'text-slate-600'}">${s.breakdown[ev.id] || 0}</td>`).join('')}
+                                <tr class="transition-colors ${rowClass}">
+                                    <td class="p-3 font-bold text-slate-600 border-r border-slate-200/50">${s.classNum}반</td>
+                                    ${currentConfigEvents.map(ev => `<td class="p-3 text-xs ${ev.type === 'raw' ? 'font-bold text-slate-600' : 'text-slate-500'}">${s.breakdown[ev.id] || 0}</td>`).join('')}
                                     <td class="p-3 font-black text-blue-600 bg-blue-50/30">${(s.total || 0).toLocaleString()}</td>
-                                    <td class="p-3"><span class="px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100">${getRank(g.grade, s.total, stats)}위</span></td>
+                                    <td class="p-3"><span class="px-2 py-0.5 rounded text-[11px] font-bold ${rankBadgeClass}">${rank}위</span></td>
                                 </tr>
                             `;
                         });
@@ -811,18 +830,6 @@
                             <div>
                                 <label class="block text-xs font-bold text-slate-500 mb-2">학교 이름</label>
                                 <input type="text" id="cfg-school" value="${window.appConfig?.schoolName || ''}" placeholder="예: 수완하나중" class="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-bold text-slate-700">
-                            </div>
-                                    <div>
-                                <label class="block text-xs font-bold text-slate-500 mb-2">1학년 반 수</label>
-                                <input type="number" id="cfg-g1" value="${currentConfigGrades.find(g=>g.grade===1)?.classes || 0}" class="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-bold text-slate-700">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold text-slate-500 mb-2">2학년 반 수</label>
-                                <input type="number" id="cfg-g2" value="${currentConfigGrades.find(g=>g.grade===2)?.classes || 0}" class="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-bold text-slate-700">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold text-slate-500 mb-2">3학년 반 수</label>
-                                <input type="number" id="cfg-g3" value="${currentConfigGrades.find(g=>g.grade===3)?.classes || 0}" class="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-bold text-slate-700">
                             </div>
                                 </div>
                             </div>
